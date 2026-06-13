@@ -13,39 +13,44 @@ export default function DashboardStats({ campaignType }: StatsProps) {
   const [recentAssets, setRecentAssets] = useState(0);
 
   useEffect(() => {
-    // Initial fetch
     const fetchStats = async () => {
-      // Fetch Campaigns
-      const { count: campaignsCount } = await supabase
+      // 1. Fetch campaigns of this type
+      const { data: campaignsData } = await supabase
         .from("campaigns")
-        .select("*", { count: "exact", head: true })
-        .eq("type", campaignType)
-        .eq("status", "active");
+        .select("id, status")
+        .eq("type", campaignType);
 
-      if (campaignsCount !== null) setActiveCampaigns(campaignsCount);
+      const allCampaigns = campaignsData || [];
+      const activeCount = allCampaigns.filter(c => c.status === "active").length;
+      setActiveCampaigns(activeCount);
 
-      // Fetch Leads linked to these campaigns
-      // For simplicity in UI without complex joins, we just fetch total leads or mock based on campaign
-      // Realistically we'd join on campaigns.type == campaignType
-      const { count: leadsCount } = await supabase
-        .from("leads")
-        .select("*", { count: "exact", head: true });
-        
-      if (leadsCount !== null) setTotalLeads(leadsCount);
+      const campaignIds = allCampaigns.map(c => c.id);
 
-      // Fetch Assets
-      const { count: assetsCount } = await supabase
-        .from("assets")
-        .select("*", { count: "exact", head: true });
+      if (campaignIds.length > 0) {
+        // 2. Fetch leads scoped to these campaigns
+        const { count: leadsCount } = await supabase
+          .from("leads")
+          .select("*", { count: "exact", head: true })
+          .in("campaign_id", campaignIds);
+        setTotalLeads(leadsCount || 0);
 
-      if (assetsCount !== null) setRecentAssets(assetsCount);
+        // 3. Fetch assets scoped to these campaigns
+        const { count: assetsCount } = await supabase
+          .from("assets")
+          .select("*", { count: "exact", head: true })
+          .in("campaign_id", campaignIds);
+        setRecentAssets(assetsCount || 0);
+      } else {
+        setTotalLeads(0);
+        setRecentAssets(0);
+      }
     };
 
     fetchStats();
 
     // Subscribe to real-time changes
     const channel = supabase
-      .channel("custom-all-channel")
+      .channel(`stats-channel-${campaignType}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "campaigns" }, fetchStats)
       .on("postgres_changes", { event: "*", schema: "public", table: "leads" }, fetchStats)
       .on("postgres_changes", { event: "*", schema: "public", table: "assets" }, fetchStats)

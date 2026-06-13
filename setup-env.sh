@@ -1,0 +1,17 @@
+#!/bin/bash
+export VERCEL_SCOPE="cashmereu3-5490s-projects"
+
+echo "https://yeoceamczddelhgligmq.supabase.co" | npx vercel env add NEXT_PUBLIC_SUPABASE_URL production --scope $VERCEL_SCOPE
+echo "https://yeoceamczddelhgligmq.supabase.co" | npx vercel env add NEXT_PUBLIC_SUPABASE_URL preview --scope $VERCEL_SCOPE
+echo "https://yeoceamczddelhgligmq.supabase.co" | npx vercel env add NEXT_PUBLIC_SUPABASE_URL development --scope $VERCEL_SCOPE
+
+echo "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inllb2NlYW1jemRkZWxoZ2xpZ21xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExNDQ4MzIsImV4cCI6MjA5NjcyMDgzMn0.5sqtKawcj7CVZFiC4QuC7drY5iC03mE4LSg8NZTAq2w" | npx vercel env add NEXT_PUBLIC_SUPABASE_ANON_KEY production --scope $VERCEL_SCOPE
+echo "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inllb2NlYW1jemRkZWxoZ2xpZ21xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExNDQ4MzIsImV4cCI6MjA5NjcyMDgzMn0.5sqtKawcj7CVZFiC4QuC7drY5iC03mE4LSg8NZTAq2w" | npx vercel env add NEXT_PUBLIC_SUPABASE_ANON_KEY preview --scope $VERCEL_SCOPE
+echo "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inllb2NlYW1jemRkZWxoZ2xpZ21xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExNDQ4MzIsImV4cCI6MjA5NjcyMDgzMn0.5sqtKawcj7CVZFiC4QuC7drY5iC03mE4LSg8NZTAq2w" | npx vercel env add NEXT_PUBLIC_SUPABASE_ANON_KEY development --scope $VERCEL_SCOPE
+
+echo "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inllb2NlYW1jemRkZWxoZ2xpZ21xIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MTE0NDgzMiwiZXhwIjoyMDk2NzIwODMyfQ.ZwBkiU81yT8VHW4ekaOan3pAN9ATwkv-6vtC9eBp4Wc" | npx vercel env add SUPABASE_SERVICE_ROLE_KEY production --scope $VERCEL_SCOPE
+echo "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inllb2NlYW1jemRkZWxoZ2xpZ21xIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MTE0NDgzMiwiZXhwIjoyMDk2NzIwODMyfQ.ZwBkiU81yT8VHW4ekaOan3pAN9ATwkv-6vtC9eBp4Wc" | npx vercel env add SUPABASE_SERVICE_ROLE_KEY preview --scope $VERCEL_SCOPE
+echo "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inllb2NlYW1jemRkZWxoZ2xpZ21xIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MTE0NDgzMiwiZXhwIjoyMDk2NzIwODMyfQ.ZwBkiU81yT8VHW4ekaOan3pAN9ATwkv-6vtC9eBp4Wc" | npx vercel env add SUPABASE_SERVICE_ROLE_KEY development --scope $VERCEL_SCOPE
+
+echo "Redeploying to apply variables..."
+npx vercel --prod --yes --scope $VERCEL_SCOPE
