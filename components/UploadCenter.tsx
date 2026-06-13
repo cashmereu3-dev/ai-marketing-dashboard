@@ -26,14 +26,23 @@ export default function UploadCenter() {
         method: "POST",
         body: formData,
       });
-      const data = await res.json();
-      if (res.ok) {
-        setUrl(data.url);
+      
+      let errorMsg = "Upload failed";
+      const contentType = res.headers.get("content-type");
+      
+      if (contentType && contentType.includes("application/json")) {
+        const data = await res.json();
+        if (res.ok) {
+          setUrl(data.url);
+        } else {
+          setError(data.error || errorMsg);
+        }
       } else {
-        setError(data.error || "Upload failed");
+        const text = await res.text();
+        setError(`Server error (${res.status}): ${text.substring(0, 100)}`);
       }
-    } catch (e) {
-      setError("Network error");
+    } catch (e: any) {
+      setError(`Network error: ${e.message}`);
     } finally {
       setUploading(false);
     }
