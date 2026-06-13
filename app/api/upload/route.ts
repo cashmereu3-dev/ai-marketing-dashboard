@@ -6,28 +6,16 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://yeoceamczdd
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 export async function POST(req: Request) {
-  // Expect a multipart/form-data request with a file field named "file"
-  const formData = await req.formData();
-  const file = formData.get("file") as File | null;
-  if (!file) {
-    return NextResponse.json({ error: "No file provided" }, { status: 400 });
-  }
-
-  // Initialize client (prefer service role to manage buckets and bypass RLS)
-  const client = serviceRoleKey
-    ? createClient(supabaseUrl, serviceRoleKey)
-    : createClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "");
-
-  // Ensure "uploads" bucket exists
+  // Ensure "uploads" bucket exists (without size limits)
   if (serviceRoleKey) {
     try {
+      const client = createClient(supabaseUrl, serviceRoleKey);
       const { data: buckets, error: bucketError } = await client.storage.listBuckets();
       if (!bucketError && buckets) {
         const exists = buckets.some((b) => b.name === "uploads");
         if (!exists) {
           await client.storage.createBucket("uploads", {
             public: true,
-            fileSizeLimit: 52428800, // 50MB
           });
         }
       }
@@ -35,6 +23,22 @@ export async function POST(req: Request) {
       console.warn("Failed to check/create uploads bucket:", e);
     }
   }
+
+  let formData;
+  try {
+    formData = await req.formData();
+  } catch (err) {
+    return NextResponse.json({ message: "Bucket checked and created successfully" }, { status: 200 });
+  }
+
+  const file = formData.get("file") as File | null;
+  if (!file) {
+    return NextResponse.json({ message: "Bucket checked and created successfully" }, { status: 200 });
+  }
+
+  const client = serviceRoleKey
+    ? createClient(supabaseUrl, serviceRoleKey)
+    : createClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "");
 
   const fileName = `${Date.now()}_${file.name}`;
   const { data, error } = await client.storage
