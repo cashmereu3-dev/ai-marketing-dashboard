@@ -3,6 +3,7 @@ import { LayoutDashboard, Music, Leaf, Video, Settings, Upload, MessageSquare, U
 
 export default function Sidebar() {
   const navItems = [
+    { name: "TubeOS (36-Agent)", href: "/tubeos", icon: Video },
     { name: "SaaS Dashboard", href: "/saas", icon: LayoutDashboard },
     { name: "Music Distribution", href: "/music", icon: Music },
     { name: "Local Landscaping", href: "/landscaping", icon: Leaf },
