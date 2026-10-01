@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import AppShell from "@/components/AppShell";
 import { AuthProvider } from "@/lib/AuthProvider";
+import GoogleTag from "@/components/GoogleTag";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -36,6 +37,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased dark`}>
       <body className="flex h-full bg-background text-foreground">
+        <GoogleTag />
         <AuthProvider>
           <AppShell>{children}</AppShell>
         </AuthProvider>

@@ -28,6 +28,23 @@ export const DATA_TOOL_SCHEMAS: Record<string, LLMTool> = {
       required: ['name'],
     },
   },
+  music_api: {
+    name: 'music_api',
+    description:
+      'Query the owner\'s music API for real data: search YouTube Music, charts, trending, top artists/tracks by country, similar tracks, synced lyrics, artist bio, track info and mood categories. Use it for music trend research and release/content ideas. Needs MUSIC_API_BASE_URL.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        endpoint: { type: 'string', description: 'search, suggestions, charts, trending, moods, top_artists, top_tracks, similar, lyrics, artist_info or track_info' },
+        q: { type: 'string', description: 'Search text (search, suggestions)' },
+        filter: { type: 'string', description: 'Search filter, e.g. songs, albums, artists (search)' },
+        country: { type: 'string', description: 'Country code such as US (charts, trending, top_*)' },
+        title: { type: 'string', description: 'Track title (similar, lyrics, track_info)' },
+        artist: { type: 'string', description: 'Artist name (similar, lyrics, artist_info, track_info)' },
+      },
+      required: ['endpoint'],
+    },
+  },
   youtube_search_videos: {
     name: 'youtube_search_videos',
     description:

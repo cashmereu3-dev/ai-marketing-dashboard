@@ -478,6 +478,35 @@ const queue_for_approval: Impl = async (input, ctx) => {
   return { queued: true, id: data?.id, status: 'pending', note: 'Waiting for Jevon to approve in The Agency > Approvals, and his phone was notified. Nothing has been published.' };
 };
 
+
+// ---------- Music API (the owner's Deno music service: YouTube Music, Last.fm, LRCLib) ----------
+// Read-only research endpoints only. Audio streaming/proxy endpoints are intentionally not exposed to agents.
+const MUSIC_ROUTES: Record<string, { path: string; params: string[] }> = {
+  search: { path: '/api/search', params: ['q', 'filter'] },
+  suggestions: { path: '/api/search/suggestions', params: ['q'] },
+  charts: { path: '/api/charts', params: ['country'] },
+  trending: { path: '/api/trending', params: ['country'] },
+  moods: { path: '/api/moods', params: [] },
+  top_artists: { path: '/api/top/artists', params: ['country'] },
+  top_tracks: { path: '/api/top/tracks', params: ['country'] },
+  similar: { path: '/api/similar', params: ['title', 'artist'] },
+  lyrics: { path: '/api/lyrics', params: ['title', 'artist'] },
+  artist_info: { path: '/api/artist/info', params: ['artist'] },
+  track_info: { path: '/api/track/info', params: ['title', 'artist'] },
+};
+const music_api: Impl = async (input) => {
+  const base = need('MUSIC_API_BASE_URL').replace(/\/+$/, '');
+  if (!/^https?:\/\//.test(base)) throw new Error('MUSIC_API_BASE_URL must start with http(s)://');
+  const ep = str(input.endpoint, 30);
+  const route = MUSIC_ROUTES[ep];
+  if (!route) throw new Error(`endpoint must be one of: ${Object.keys(MUSIC_ROUTES).join(', ')}`);
+  const qs = new URLSearchParams();
+  for (const k of route.params) { const v = str((input as Record<string, unknown>)[k], 200); if (v) qs.set(k, v); }
+  const body = await getJson(`${base}${route.path}${qs.toString() ? `?${qs}` : ''}`);
+  const text = JSON.stringify(body);
+  return { endpoint: ep, result: text.length > 9000 ? { truncated: true, preview: text.slice(0, 9000) } : body, source: 'Owner music API' };
+};
+
 // ---------- doctor (read-only health check) ----------
 const KEY_REQUIREMENTS: Record<string, string[]> = {
   youtube_search_videos: ['YOUTUBE_API_KEY'],
@@ -486,13 +515,14 @@ const KEY_REQUIREMENTS: Record<string, string[]> = {
   spotify_artist_lookup: ['SPOTIFY_CLIENT_ID', 'SPOTIFY_CLIENT_SECRET'],
   cloudinary_list_videos: ['CLOUDINARY_CLOUD_NAME', 'CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET'],
   render_video_clip: ['CLOUDINARY_CLOUD_NAME'],
+  music_api: ['MUSIC_API_BASE_URL'],
 };
 
 const agency_doctor: Impl = async (_input, ctx) => {
   const { AGENCY_AGENTS } = await import('./agentRegistry');
   const set = (k: string) => Boolean(process.env[k]);
   const claude = set('ANTHROPIC_API_KEY');
-  const gemini = set('GEMINI_API_KEY') || set('GOOGLE_API_KEY');
+  const open_model = set('OPEN_LLM_API_KEY') || set('GROQ_API_KEY') || set('OPENROUTER_API_KEY');
 
   const tableOk = async (t: string) => {
     try {
@@ -512,7 +542,7 @@ const agency_doctor: Impl = async (_input, ctx) => {
   });
   return {
     agent: ctx.agentId,
-    models: { claude, gemini, provider_mode: process.env.AGENCY_PROVIDER || 'auto' },
+    models: { claude, open_model, provider_mode: process.env.AGENCY_PROVIDER || 'auto' },
     database: { approval_queue: queue, shared_memory: memory },
     phone_notifications: { web_push: set('VAPID_PRIVATE_KEY') && set('NEXT_PUBLIC_VAPID_PUBLIC_KEY'), ntfy: set('NTFY_TOPIC') },
     your_data_tools: tools,
@@ -545,5 +575,6 @@ export const DATA_TOOLS: Record<string, Impl> = {
   summarize_series,
   cloudinary_list_videos,
   render_video_clip,
+  music_api,
   queue_for_approval,
 };

@@ -1,6 +1,6 @@
 // lib/agency/agenticRunner.ts
 /**
- * The Agency agent runtime (SERVER-ONLY — reads ANTHROPIC_API_KEY / GEMINI_API_KEY, never import from client code).
+ * The Agency agent runtime (SERVER-ONLY — reads ANTHROPIC_API_KEY / OPEN_LLM_API_KEY, never import from client code).
  *
  * Live mode runs a genuine tool-use loop per agent:
  *   model reasons -> calls tools (real computations, web search, shared memory, delegation)
@@ -426,5 +426,5 @@ export async function executeAgenticAgent(
   const agent = AGENCY_AGENTS.find((a) => a.id === agentId);
   if (!agent) throw new Error(`Unknown agent: ${agentId}`);
   if (opts.live !== false && isLiveAvailable()) return runLiveAgent(agent, userGoal, sharedContext);
-  return runSimulatedAgent(agent, userGoal, sharedContext, 'Simulated run: no AI key (ANTHROPIC_API_KEY or GEMINI_API_KEY) is set on the server, so no model was called.');
+  return runSimulatedAgent(agent, userGoal, sharedContext, 'Simulated run: no AI key (ANTHROPIC_API_KEY or OPEN_LLM_API_KEY) is set on the server, so no model was called.');
 }

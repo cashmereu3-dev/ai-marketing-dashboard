@@ -56,8 +56,8 @@ export const TOOL_GRANTS: Record<string, string[]> = {
   bc_insight_extraction: ['facebook_page_insights', 'youtube_channel_stats', 'spotify_artist_lookup', 'summarize_series', 'compute_growth_rate'],
 
   // ── Silverfoxx2u Music ───────────────────────────────────────
-  sf_spotify_optimization: ['spotify_artist_lookup', 'queue_for_approval'],
-  sf_apple_music: ['itunes_search', 'queue_for_approval'],
+  sf_spotify_optimization: ['spotify_artist_lookup', 'music_api', 'queue_for_approval'],
+  sf_apple_music: ['itunes_search', 'music_api', 'queue_for_approval'],
   sf_amplitude_analytics: [
     'spotify_artist_lookup',
     'itunes_search',
@@ -67,8 +67,8 @@ export const TOOL_GRANTS: Record<string, string[]> = {
     'compute_growth_rate',
     'summarize_series',
   ],
-  sf_social_viral: ['content_list_files', 'content_read_file', 'youtube_search_videos', 'queue_for_approval'],
+  sf_social_viral: ['content_list_files', 'content_read_file', 'youtube_search_videos', 'music_api', 'queue_for_approval'],
   sf_content_clipping: ['content_list_files', 'content_read_file', 'cloudinary_list_videos', 'render_video_clip', 'queue_for_approval'],
-  sf_platform_distribution: ['queue_for_approval'],
+  sf_platform_distribution: ['music_api', 'queue_for_approval'],
   sf_crm_fan_engagement: ['queue_for_approval'],
 };

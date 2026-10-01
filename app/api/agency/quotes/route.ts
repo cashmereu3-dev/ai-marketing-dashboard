@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireUser } from '@/lib/agency/auth';
 import { loadQuotes, saveQuotes, sanitizeQuoteCfg, quoteStatus, testRun, liveRun, refreshEngagement } from '@/lib/agency/quoteAgents';
-import { linkedinConfigured } from '@/lib/agency/publish';
+import { diagnose } from '@/lib/agency/linkedin';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
@@ -10,7 +10,7 @@ async function view(refresh = false) {
   const st = await loadQuotes();
   if (refresh && (await refreshEngagement(st))) await saveQuotes(st).catch(() => undefined);
   return {
-    linkedinConnected: linkedinConfigured(), facebookConnected: Boolean(process.env.FACEBOOK_PAGE_ID && process.env.FACEBOOK_PAGE_ACCESS_TOKEN), cronConfigured: Boolean(process.env.CRON_SECRET),
+    linkedin: await diagnose(), facebookConnected: Boolean(process.env.FACEBOOK_PAGE_ID && process.env.FACEBOOK_PAGE_ACCESS_TOKEN), cronConfigured: Boolean(process.env.CRON_SECRET),
     agents: Object.values(st.agents).map((cfg) => {
       const mine = st.history.filter((h) => h.agentId === cfg.id);
       const eng = mine.filter((h) => h.engagement);

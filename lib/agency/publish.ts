@@ -92,19 +92,16 @@ export async function facebookEngagement(postId: string): Promise<{ likes: numbe
   } catch { return null; }
 }
 
-export function linkedinConfigured(): boolean {
-  return Boolean(process.env.LINKEDIN_ACCESS_TOKEN && process.env.LINKEDIN_AUTHOR_URN);
-}
+export interface LinkedInCreds { token: string; urn: string }
 
-/** Posts text to LinkedIn through the official UGC Posts API. Needs LINKEDIN_ACCESS_TOKEN (w_member_social) and LINKEDIN_AUTHOR_URN. */
-export async function publishLinkedIn(text: string): Promise<PublishResult> {
-  if (!linkedinConfigured()) return { published: false, reason: 'LinkedIn is not connected (LINKEDIN_ACCESS_TOKEN / LINKEDIN_AUTHOR_URN are not set).' };
+/** Posts text to LinkedIn through the official UGC Posts API using resolved credentials. Returns the exact API error on failure. */
+export async function publishLinkedIn(text: string, creds: LinkedInCreds): Promise<PublishResult> {
   try {
     const res = await fetch('https://api.linkedin.com/v2/ugcPosts', {
       method: 'POST',
-      headers: { Authorization: `Bearer ${process.env.LINKEDIN_ACCESS_TOKEN}`, 'Content-Type': 'application/json', 'X-Restli-Protocol-Version': '2.0.0' },
+      headers: { Authorization: `Bearer ${creds.token}`, 'Content-Type': 'application/json', 'X-Restli-Protocol-Version': '2.0.0' },
       body: JSON.stringify({
-        author: process.env.LINKEDIN_AUTHOR_URN,
+        author: creds.urn,
         lifecycleState: 'PUBLISHED',
         specificContent: { 'com.linkedin.ugc.ShareContent': { shareCommentary: { text }, shareMediaCategory: 'NONE' } },
         visibility: { 'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC' },
@@ -112,11 +109,11 @@ export async function publishLinkedIn(text: string): Promise<PublishResult> {
       signal: AbortSignal.timeout(30000),
     });
     const body = (await res.json().catch(() => ({}))) as { id?: string; message?: string };
-    if (!res.ok) return { published: false, reason: body.message || `LinkedIn responded ${res.status}` };
+    if (!res.ok) return { published: false, reason: `LinkedIn ${res.status}: ${body.message || 'request rejected'}` };
     const id = res.headers.get('x-restli-id') || body.id;
     if (!id) return { published: false, reason: 'LinkedIn accepted the request but returned no post id.' };
     return { published: true, externalId: id, scheduled: false };
   } catch (e) {
-    return { published: false, reason: e instanceof Error ? e.message : 'LinkedIn publish failed.' };
+    return { published: false, reason: e instanceof Error ? `LinkedIn request failed: ${e.message}` : 'LinkedIn publish failed.' };
   }
 }

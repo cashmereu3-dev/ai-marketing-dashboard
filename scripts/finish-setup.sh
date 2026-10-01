@@ -13,6 +13,8 @@ set_env() { # set_env NAME VALUE  (replace or append in .env.local)
 }
 ask() { # ask NAME PROMPT  (hidden input; Enter to skip)
   local v; read -r -s -p "$2 (Enter to skip): " v; echo
+  # Reject anything that is not one clean line of key characters (shell commands, spaces, quotes, multiline paste).
+  if [ -n "$v" ] && ! printf '%s' "$v" | LC_ALL=C grep -Eq '^[A-Za-z0-9._~+/=:@-]+$'; then echo "  Rejected: that is not a single clean value. Nothing saved for $1."; return 0; fi
   [ -n "$v" ] && set_env "$1" "$v" && echo "  saved $1" || echo "  skipped $1"
 }
 
@@ -28,7 +30,7 @@ fi
 set_env AGENCY_PROVIDER auto
 echo "AI keys:"
 ask ANTHROPIC_API_KEY "Claude API key"
-ask GEMINI_API_KEY "Google Gemini API key"
+ask OPEN_LLM_API_KEY "Free open-model key (Groq or OpenRouter, optional backup)"
 echo "Optional data keys:"
 ask YOUTUBE_API_KEY "YouTube Data API key"
 ask CLOUDINARY_CLOUD_NAME "Cloudinary cloud name"

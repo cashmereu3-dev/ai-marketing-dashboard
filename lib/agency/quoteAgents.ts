@@ -4,7 +4,8 @@
 import { getServiceClient } from './serverSupabase';
 import { CONTENT_BUCKET, ensureBucket } from './content';
 import { callClaude } from './llm';
-import { publishApproved, publishLinkedIn, linkedinConfigured, facebookHasPost, facebookEngagement } from './publish';
+import { publishApproved, publishLinkedIn, facebookHasPost, facebookEngagement } from './publish';
+import { getCredentials } from './linkedin';
 import { localParts } from './schedule';
 
 export interface QuoteCfg {
@@ -221,13 +222,8 @@ export async function liveRun(cfg: QuoteCfg, st: QuoteState): Promise<RunReport>
 
   let result: Awaited<ReturnType<typeof publishLinkedIn>> | undefined;
   if (cfg.platform === 'linkedin') {
-    if (!linkedinConfigured()) {
-      const q = await queueForApproval(cfg, entry, 'LinkedIn is not connected; post this one manually or connect LinkedIn.');
-      entry.status = q ? 'queued' : 'failed';
-      entry.error = 'LinkedIn is not connected (LINKEDIN_ACCESS_TOKEN / LINKEDIN_AUTHOR_URN missing). ' + (q ? 'Draft is waiting in Approvals.' : '');
-      return rep({ ok: false, category: entry.category, candidate: c, qc: p.qc, duplicate: p.duplicate, status: entry.status, attempts: p.attempts, entry, error: entry.error });
-    }
-    result = await publishLinkedIn(entry.post);
+    const cred = await getCredentials(); // resolves + caches the member ID from the token automatically
+    result = cred.ok ? await publishLinkedIn(entry.post, cred.creds) : { published: false, reason: cred.reason };
   } else {
     result = await publishApproved({ id: entry.id, platform: 'facebook', title: entry.topic, content: entry.post, media_url: null, scheduled_for: null });
     if (!result.published) {
@@ -237,7 +233,13 @@ export async function liveRun(cfg: QuoteCfg, st: QuoteState): Promise<RunReport>
     }
   }
   if (result.published) { entry.status = 'published'; entry.externalId = result.externalId; }
-  else { entry.status = 'failed'; entry.error = result.reason; }
+  else {
+    // Never silent: record the exact error and route the finished post to Approvals so it is not lost.
+    entry.error = result.reason;
+    const q = await queueForApproval(cfg, entry, `Automatic publishing failed: ${result.reason}`.slice(0, 400));
+    entry.status = q ? 'queued' : 'failed';
+    if (!q) entry.error += ' (also could not write to the approval queue)';
+  }
   return rep({ ok: entry.status === 'published', category: entry.category, candidate: c, qc: p.qc, duplicate: p.duplicate, status: entry.status, attempts: p.attempts, entry, error: entry.error });
 }
 

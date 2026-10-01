@@ -1,11 +1,12 @@
 // lib/agency/llm.ts
 // Model client for The Agency (plain fetch — no SDK dependency). Server-only.
-// Providers: Claude (ANTHROPIC_API_KEY) and Google Gemini (GEMINI_API_KEY or GOOGLE_API_KEY).
-// All agents share both keys. The runner speaks Anthropic's message format; Gemini calls are
-// translated to/from it here so agents work identically on either provider.
-//   AGENCY_PROVIDER = auto (default) | anthropic | gemini
-//   auto: Claude first; if Claude fails (rate limit, outage, billing) and a Gemini key exists, retry on Gemini.
-// Note: Claude's built-in web_search is Anthropic-only; on Gemini agents run without it.
+// Providers: Claude (ANTHROPIC_API_KEY) and a free open-source model through any OpenAI-compatible endpoint
+// (default: Groq serving Llama; also works with OpenRouter free models, Together, a self-hosted vLLM, etc.).
+//   OPEN_LLM_API_KEY, OPEN_LLM_BASE_URL (default https://api.groq.com/openai/v1), OPEN_LLM_MODEL (default llama-3.3-70b-versatile)
+//   AGENCY_PROVIDER = auto (default) | anthropic | open
+//   auto: Claude first; if Claude fails (rate limit, outage, billing) and an open-model key exists, retry there.
+// The runner speaks Anthropic's message format; open-model calls are translated here so agents work the same on either.
+// Note: Claude's built-in web_search is Anthropic-only; on the open model agents run without it.
 
 const API_URL = 'https://api.anthropic.com/v1/messages';
 export const DEFAULT_MODEL = process.env.AGENCY_MODEL || process.env.TUBEOS_MODEL || 'claude-sonnet-5-5';
@@ -74,10 +75,10 @@ function backoff(attempt: number): Promise<void> {
   return sleep(Math.min(8000, 1000 * 2 ** attempt) + Math.floor(Math.random() * 400));
 }
 
-export const GEMINI_MODEL = process.env.AGENCY_GEMINI_MODEL || 'gemini-3.8-flash';
-
-function geminiKey(): string | undefined {
-  return process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || undefined;
+export const OPEN_MODEL = process.env.OPEN_LLM_MODEL || 'llama-3.3-70b-versatile';
+const openBase = () => (process.env.OPEN_LLM_BASE_URL || 'https://api.groq.com/openai/v1').replace(/\/+$/, '');
+function openKey(): string | undefined {
+  return process.env.OPEN_LLM_API_KEY || process.env.GROQ_API_KEY || process.env.OPENROUTER_API_KEY || undefined;
 }
 
 /** Real Anthropic keys start with "sk-ant-"; a placeholder would only 401 and waste time on every call. */
@@ -86,7 +87,7 @@ function looksLikeAnthropicKey(k?: string): boolean {
 }
 
 export function isLiveAvailable(): boolean {
-  return Boolean(looksLikeAnthropicKey(process.env.ANTHROPIC_API_KEY) || geminiKey());
+  return Boolean(looksLikeAnthropicKey(process.env.ANTHROPIC_API_KEY) || openKey());
 }
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -99,23 +100,21 @@ export interface LLMCallParams {
   model?: string;
 }
 
-// Entry point used by the agent runner (name kept for compatibility): routes to Claude or Gemini.
+// Entry point used by the agent runner (name kept for compatibility): routes to Claude or the open model.
 export async function callClaude(params: LLMCallParams): Promise<LLMResponse> {
   const mode = (process.env.AGENCY_PROVIDER || 'auto').toLowerCase();
   const hasClaude = looksLikeAnthropicKey(process.env.ANTHROPIC_API_KEY);
-  const hasGemini = Boolean(geminiKey());
+  const hasOpen = Boolean(openKey());
 
-  if (mode === 'gemini') return callGemini(params);
+  if (mode === 'open') return callOpen(params);
   if (mode === 'anthropic') return callAnthropic(params);
-  if (!hasClaude && hasGemini) return callGemini(params);
-  if (!hasClaude && hasGemini) return callGemini(params);
-  if (!hasClaude) throw new LLMError(500, 'No AI key set: add ANTHROPIC_API_KEY and/or GEMINI_API_KEY on the server.');
+  if (!hasClaude && hasOpen) return callOpen(params);
+  if (!hasClaude) throw new LLMError(500, 'No AI key set: add ANTHROPIC_API_KEY and/or OPEN_LLM_API_KEY on the server.');
   try {
     return await callAnthropic(params);
   } catch (err) {
-    // Fall back to Gemini on outages / rate limits / billing / auth. A 400 is a request bug (or web_search
-    // not enabled), which the runner handles itself, so it is not retried here.
-    if (hasGemini && err instanceof LLMError && err.status !== 400) return callGemini(params);
+    // Fall back to the open model on outages / rate limits / billing / auth. A 400 is a request bug, handled by the runner.
+    if (hasOpen && err instanceof LLMError && err.status !== 400) return callOpen(params);
     throw err;
   }
 }
@@ -160,135 +159,61 @@ async function callAnthropic(params: LLMCallParams): Promise<LLMResponse> {
   throw lastErr as LLMError;
 }
 
-// ───────────────────────── Google Gemini ─────────────────────────
+// ───────────────────────── Open-source model (OpenAI-compatible) ─────────────────────────
 
 type Json = Record<string, unknown>;
 
-// Gemini accepts an OpenAPI-style subset of JSON Schema; drop what it rejects.
-function toGeminiSchema(node: unknown): unknown {
-  if (Array.isArray(node)) return node.map(toGeminiSchema);
-  if (!node || typeof node !== 'object') return node;
-  const out: Json = {};
-  for (const [k, v] of Object.entries(node as Json)) {
-    if (['additionalProperties', '$schema', '$id', '$ref', 'default', 'examples', 'title'].includes(k)) continue;
-    if (k === 'type' && Array.isArray(v)) {
-      const t = v.find((x) => x !== 'null');
-      out.type = t ?? 'string';
-      if (v.includes('null')) out.nullable = true;
-      continue;
+function toOpenMessages(system: string, messages: LLMMessage[]): Json[] {
+  const out: Json[] = [{ role: 'system', content: system }];
+  for (const m of messages) {
+    if (typeof m.content === 'string') { out.push({ role: m.role, content: m.content }); continue; }
+    if (m.role === 'assistant') {
+      const text = m.content.filter((b) => b.type === 'text').map((b) => String(b.text ?? '')).join('\n');
+      const calls = m.content.filter((b) => b.type === 'tool_use').map((b) => ({ id: String(b.id), type: 'function', function: { name: b.name, arguments: JSON.stringify(b.input ?? {}) } }));
+      out.push({ role: 'assistant', content: text || null, ...(calls.length ? { tool_calls: calls } : {}) });
+    } else {
+      const text = m.content.filter((b) => b.type === 'text').map((b) => String(b.text ?? '')).join('\n');
+      for (const b of m.content) if (b.type === 'tool_result') out.push({ role: 'tool', tool_call_id: String(b.tool_use_id), content: typeof b.content === 'string' ? b.content : JSON.stringify(b.content) });
+      if (text) out.push({ role: 'user', content: text });
     }
-    if (k === 'enum' && Array.isArray(v)) { out.enum = v.map(String); continue; }
-    if (k === 'properties' && v && typeof v === 'object' && !Array.isArray(v)) {
-      // Property NAMES (e.g. a property called "title") are not schema keywords; never strip them.
-      out.properties = Object.fromEntries(Object.entries(v as Json).map(([name, def]) => [name, toGeminiSchema(def)]));
-      continue;
-    }
-    out[k] = toGeminiSchema(v);
   }
   return out;
 }
 
-function toGeminiContents(messages: LLMMessage[]): Json[] {
-  const nameById = new Map<string, string>();
-  const contents: Json[] = [];
-  for (const m of messages) {
-    if (typeof m.content === 'string') {
-      contents.push({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] });
-      continue;
-    }
-    const parts: Json[] = [];
-    for (const b of m.content) {
-      if (b.type === 'text' && typeof b.text === 'string') {
-        if (b.text) parts.push({ text: b.text });
-      } else if (b.type === 'tool_use') {
-        nameById.set(String(b.id), String(b.name));
-        const part: Json = { functionCall: { name: b.name, args: (b.input as Json) ?? {} } };
-        if (typeof b.thought_signature === 'string') part.thoughtSignature = b.thought_signature;
-        parts.push(part);
-      } else if (b.type === 'tool_result') {
-        const name = nameById.get(String(b.tool_use_id)) ?? 'tool';
-        const raw = typeof b.content === 'string' ? b.content : JSON.stringify(b.content);
-        parts.push({ functionResponse: { name, response: b.is_error ? { error: raw } : { result: raw } } });
-      }
-      // server_tool_use / web_search_tool_result blocks are Anthropic-only and are skipped.
-    }
-    if (parts.length) contents.push({ role: m.role === 'assistant' ? 'model' : 'user', parts });
-  }
-  return contents;
-}
-
-/** If the primary Gemini model stays overloaded, one more try on a second model (same provider, same key). */
-async function callGemini(params: LLMCallParams): Promise<LLMResponse> {
-  const primary = process.env.AGENCY_GEMINI_MODEL || GEMINI_MODEL;
-  const fallback = process.env.AGENCY_GEMINI_FALLBACK_MODEL || 'gemini-2.5-flash';
-  try {
-    return await callGeminiModel(params, primary, MAX_ATTEMPTS);
-  } catch (e) {
-    if (e instanceof LLMError && e.retryable && fallback && fallback !== primary) return callGeminiModel(params, fallback, 2);
-    throw e;
-  }
-}
-
-async function callGeminiModel(params: LLMCallParams, model: string, attempts: number): Promise<LLMResponse> {
-  const apiKey = geminiKey();
-  if (!apiKey) throw new LLMError(500, 'GEMINI_API_KEY is not set on the server.');
-
-  const declarations = params.tools
-    .filter((t) => t.input_schema) // server tools (web_search) have no schema and are Claude-only
-    .map((t) => ({ name: t.name, description: t.description ?? '', parameters: toGeminiSchema(t.input_schema) }));
-
+async function callOpen(params: LLMCallParams): Promise<LLMResponse> {
+  const apiKey = openKey();
+  if (!apiKey) throw new LLMError(500, 'OPEN_LLM_API_KEY is not set on the server.');
+  const tools = params.tools.filter((t) => t.input_schema).map((t) => ({ type: 'function', function: { name: t.name, description: t.description ?? '', parameters: t.input_schema } }));
   const body = JSON.stringify({
-    systemInstruction: { parts: [{ text: params.system }] },
-    contents: toGeminiContents(params.messages),
-    ...(declarations.length ? { tools: [{ functionDeclarations: declarations }] } : {}),
-    generationConfig: { maxOutputTokens: params.maxTokens ?? 2500 },
+    model: process.env.OPEN_LLM_MODEL || OPEN_MODEL,
+    messages: toOpenMessages(params.system, params.messages),
+    max_tokens: params.maxTokens ?? 2500,
+    ...(tools.length ? { tools, tool_choice: 'auto' } : {}),
   });
-
   let lastErr: LLMError | null = null;
-  for (let attempt = 0; attempt < attempts; attempt++) {
-    let res: Response;
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     try {
-      res = await timedFetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey },
-        body,
-      }, 'Gemini');
+      const res = await timedFetch(`${openBase()}/chat/completions`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${apiKey}` }, body }, 'Open model');
+      if (res.ok) {
+        const data = (await res.json()) as { choices?: { message?: { content?: string | null; tool_calls?: { id: string; function: { name: string; arguments: string } }[] }; finish_reason?: string }[]; usage?: { prompt_tokens?: number; completion_tokens?: number } };
+        const ch = data.choices?.[0];
+        if (!ch?.message) throw new LLMError(502, 'The open model returned no message.');
+        const content: ContentBlock[] = [];
+        if (ch.message.content) content.push({ type: 'text', text: ch.message.content });
+        for (const tc of ch.message.tool_calls ?? []) {
+          let input: Json = {};
+          try { input = JSON.parse(tc.function.arguments || '{}') as Json; } catch { /* leave empty; the tool reports missing args */ }
+          content.push({ type: 'tool_use', id: tc.id, name: tc.function.name, input });
+        }
+        return { content, stop_reason: content.some((b) => b.type === 'tool_use') ? 'tool_use' : ch.finish_reason === 'length' ? 'max_tokens' : 'end_turn', usage: { input_tokens: data.usage?.prompt_tokens ?? 0, output_tokens: data.usage?.completion_tokens ?? 0 } };
+      }
+      lastErr = new LLMError(res.status, `Open model API ${res.status}: ${(await res.text()).slice(0, 600)}`);
     } catch (e) {
       if (!(e instanceof LLMError)) throw e;
       lastErr = e;
-      if (attempt < attempts - 1) await backoff(attempt);
-      continue;
     }
-    if (res.ok) {
-      const data = (await res.json()) as {
-        candidates?: { content?: { parts?: Json[] }; finishReason?: string }[];
-        usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number };
-        promptFeedback?: { blockReason?: string };
-      };
-      const cand = data.candidates?.[0];
-      if (!cand) throw new LLMError(502, `Gemini returned no candidates${data.promptFeedback?.blockReason ? ` (blocked: ${data.promptFeedback.blockReason})` : ''}.`);
-      const content: ContentBlock[] = [];
-      let n = 0;
-      for (const part of cand.content?.parts ?? []) {
-        if (typeof part.text === 'string' && part.thought !== true) {
-          content.push({ type: 'text', text: part.text });
-        } else if (part.functionCall && typeof part.functionCall === 'object') {
-          const fc = part.functionCall as { name: string; args?: Json };
-          const block: ContentBlock = { type: 'tool_use', id: `gem_${Date.now().toString(36)}_${n++}`, name: fc.name, input: fc.args ?? {} };
-          if (typeof part.thoughtSignature === 'string') block.thought_signature = part.thoughtSignature;
-          content.push(block);
-        }
-      }
-      return {
-        content,
-        stop_reason: content.some((b) => b.type === 'tool_use') ? 'tool_use' : cand.finishReason === 'MAX_TOKENS' ? 'max_tokens' : 'end_turn',
-        usage: { input_tokens: data.usageMetadata?.promptTokenCount ?? 0, output_tokens: data.usageMetadata?.candidatesTokenCount ?? 0 },
-      };
-    }
-    const text = (await res.text()).slice(0, 600);
-    lastErr = new LLMError(res.status, `Gemini API ${res.status}: ${text}`);
     if (!lastErr.retryable) break;
-    if (attempt < attempts - 1) await backoff(attempt);
+    if (attempt < MAX_ATTEMPTS - 1) await backoff(attempt);
   }
   throw lastErr as LLMError;
 }

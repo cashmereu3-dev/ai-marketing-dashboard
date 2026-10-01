@@ -12,21 +12,34 @@ const inp = "bg-background border border-border rounded px-2 py-1 text-sm";
 
 export default function QuoteAgents() {
   const [rows, setRows] = useState<Row[]>([]);
-  const [li, setLi] = useState(true);
+  const [li, setLi] = useState<{ connected: boolean; member: string | null; problem: string | null; source: string | null; expiresAt: string | null; requiredScopes: string; oauthAvailable: boolean } | null>(null);
+  const [tok, setTok] = useState("");
   const [fb, setFb] = useState(true);
   const [busy, setBusy] = useState("");
   const [msg, setMsg] = useState("");
   const [reports, setReports] = useState<Record<string, Report>>({});
   const [openTone, setOpenTone] = useState<string>("");
 
-  const apply = (d: { agents?: Row[]; linkedinConnected?: boolean; facebookConnected?: boolean; error?: string }) => {
+  const apply = (d: { agents?: Row[]; linkedin?: NonNullable<typeof li>; facebookConnected?: boolean; error?: string }) => {
     if (d.agents) setRows(d.agents);
-    if (typeof d.linkedinConnected === "boolean") setLi(d.linkedinConnected);
+    if (d.linkedin) setLi(d.linkedin);
     if (typeof d.facebookConnected === "boolean") setFb(d.facebookConnected);
     if (d.error) setMsg(d.error);
   };
   const load = useCallback(async () => { try { apply(await (await authFetch("/api/agency/quotes")).json()); } catch { setMsg("Could not load."); } }, []);
   useEffect(() => { void load(); }, [load]);
+
+  const liCall = async (body: Record<string, unknown>) => {
+    setBusy("li"); setMsg("");
+    try {
+      const d = await (await authFetch("/api/agency/linkedin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })).json();
+      if (d.url) { window.location.assign(d.url); return; }
+      if (d.connected !== undefined) setLi(d);
+      setMsg(d.error || (d.ok ? "LinkedIn connected." : ""));
+      if (d.ok) setTok("");
+    } catch { setMsg("Request failed."); }
+    setBusy("");
+  };
 
   const patch = async (id: string, p: Partial<Cfg>) => {
     setRows((r) => r.map((x) => (x.cfg.id === id ? { ...x, cfg: { ...x.cfg, ...p } } : x)));
@@ -49,7 +62,23 @@ export default function QuoteAgents() {
         <p className="text-sm text-gray-400">One quality post a day, 6:00 AM Central. Posts are checked for quality, duplicates and unverifiable attributions before they go out.</p>
       </div>
       {!fb && <p className="rounded border border-yellow-600 bg-yellow-900/30 p-3 text-sm text-yellow-200">Facebook is not connected on the server.</p>}
-      {!li && <p className="rounded border border-yellow-600 bg-yellow-900/30 p-3 text-sm text-yellow-200">LinkedIn is not connected yet (needs LINKEDIN_ACCESS_TOKEN and LINKEDIN_AUTHOR_URN). Until then the Business Quote Master drafts into Approvals instead of posting.</p>}
+      {li && (
+        <div className="rounded-xl border border-border bg-card p-4 space-y-2 text-sm">
+          <p className="font-semibold text-white">LinkedIn: {li.connected ? `connected${li.member ? " as " + li.member : ""}` : "not connected"}</p>
+          {li.connected && <p className="text-xs text-gray-400">Posting automatically{li.expiresAt ? ` · token expires ${li.expiresAt.slice(0, 10)}` : ""}.</p>}
+          {!li.connected && li.problem && <p className="text-xs text-yellow-200">{li.problem} Until it is fixed, the Business Quote Master saves its daily post to Approvals.</p>}
+          {!li.connected && (
+            <div className="flex flex-wrap items-center gap-2">
+              <button disabled={busy === "li" || !li.oauthAvailable} onClick={() => liCall({ action: "oauth" })} className="rounded bg-accent px-3 py-1 font-semibold text-white disabled:opacity-40">Connect with LinkedIn</button>
+              <form autoComplete="off" onSubmit={(e) => { e.preventDefault(); void liCall({ action: "token", token: tok.trim() }); }} className="flex items-center gap-2">
+                <input type="password" value={tok} onChange={(e) => setTok(e.target.value)} placeholder="or paste an access token" className={`${inp} w-64`} />
+                <button disabled={busy === "li" || tok.trim().length < 20} className="rounded border border-border px-3 py-1 text-gray-200 disabled:opacity-40">Verify &amp; save</button>
+              </form>
+            </div>
+          )}
+          {!li.connected && !li.oauthAvailable && <p className="text-xs text-gray-500">One-click connect needs the LinkedIn app credentials on the server. A pasted token is verified with LinkedIn first and never saved if invalid.</p>}
+        </div>
+      )}
       {msg && <p className="text-sm text-gray-300">{msg}</p>}
       {!rows.length && <Loader2 className="h-5 w-5 animate-spin text-gray-400" />}
       {rows.map(({ cfg: c, status: s, published, queued, failed, engagement: e, last, recent }) => {
