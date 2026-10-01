@@ -40,7 +40,7 @@ export class LLMError extends Error {
   }
 }
 
-export const GEMINI_MODEL = process.env.AGENCY_GEMINI_MODEL || 'gemini-2.5-pro';
+export const GEMINI_MODEL = process.env.AGENCY_GEMINI_MODEL || 'gemini-3.8-flash';
 
 function geminiKey(): string | undefined {
   return process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || undefined;
