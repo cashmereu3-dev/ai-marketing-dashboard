@@ -3,7 +3,7 @@
 import { NextResponse } from 'next/server';
 import { requireUser } from '@/lib/agency/auth';
 import { getServiceClient } from '@/lib/agency/serverSupabase';
-import { sendPushToAll, sendNtfy, ntfyInfo } from '@/lib/agency/notify';
+import { sendPushToAll, sendNtfy, sendSms, sendWhatsApp, ntfyInfo } from '@/lib/agency/notify';
 
 export const runtime = 'nodejs';
 
@@ -29,12 +29,14 @@ export async function POST(req: Request) {
   }
 
   if (body.action === 'test') {
-    const [n, r] = await Promise.all([
+    const [w, m, n, r] = await Promise.all([
+      sendWhatsApp('The Agency: WhatsApp alerts are working. Approvals will arrive here.'),
+      sendSms('The Agency: text alerts are working. Approvals will arrive here.'),
       sendNtfy('The Agency', 'Notifications are working. Approvals will show up here.'),
       sendPushToAll({ title: 'The Agency', body: 'Notifications are working. Approvals will show up here.', url: '/approvals', tag: 'agency-test' }),
     ]);
-    if (!n.sent && r.skipped) return NextResponse.json({ error: `Could not send. ntfy: ${n.skipped}. Browser push: ${r.skipped}` }, { status: 503 });
-    return NextResponse.json({ ntfy: n.sent, sent: r.sent, failed: r.failed });
+    if (!w.sent && !m.sent && !n.sent && r.skipped) return NextResponse.json({ error: `Could not send. WhatsApp: ${w.skipped}. SMS: ${m.skipped}. ntfy: ${n.skipped}. Browser push: ${r.skipped}` }, { status: 503 });
+    return NextResponse.json({ whatsapp: w.sent, whatsappNote: w.skipped, sms: m.sent, smsNote: m.skipped, ntfy: n.sent, sent: r.sent, failed: r.failed });
   }
 
   const sub = body.subscription;

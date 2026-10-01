@@ -1,7 +1,8 @@
 // lib/agency/notify.ts
 // Phone notifications when a draft needs approval (SERVER-ONLY).
 //   1. ntfy push (MAIN): the free ntfy app, subscribed to NTFY_TOPIC. Most reliable on Android.
-//   2. Web Push to every device that turned notifications on in the browser/PWA.
+//   2. SMS text via Twilio (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM, ALERT_PHONE).
+//   3. Web Push to every device that turned notifications on in the browser/PWA.
 // Never throws: a failed notification must not lose the queued draft.
 import webpush from 'web-push';
 import { getServiceClient } from './serverSupabase';
@@ -82,9 +83,51 @@ export async function sendNtfy(title: string, body: string, opts: { brand?: stri
   }
 }
 
+// Twilio message to one recipient. SMS: From = TWILIO_FROM, To = ALERT_PHONE.
+// WhatsApp: From = TWILIO_WHATSAPP_FROM (sandbox default whatsapp:+14155238886), To = ALERT_WHATSAPP.
+async function twilioSend(from: string, to: string, body: string): Promise<{ sent: boolean; skipped?: string }> {
+  const sid = process.env.TWILIO_ACCOUNT_SID;
+  const token = process.env.TWILIO_AUTH_TOKEN;
+  if (!sid || !token) return { sent: false, skipped: 'Set TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN.' };
+  const base = (process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/$/, '');
+  const text = (base ? `${body}\n${base}/approvals` : body).slice(0, 600);
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), 8000);
+  try {
+    const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(sid)}/Messages.json`, {
+      method: 'POST',
+      headers: { Authorization: 'Basic ' + Buffer.from(`${sid}:${token}`).toString('base64'), 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ To: to, From: from, Body: text }).toString(),
+      signal: ctl.signal,
+    });
+    if (res.ok) return { sent: true };
+    const err = (await res.json().catch(() => ({}))) as { message?: string };
+    return { sent: false, skipped: `Twilio ${res.status}: ${err.message ?? 'send failed'}` };
+  } catch (e) {
+    return { sent: false, skipped: e instanceof Error ? e.message : 'Twilio request failed' };
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+export async function sendSms(body: string): Promise<{ sent: boolean; skipped?: string }> {
+  const from = process.env.TWILIO_FROM;
+  const to = process.env.ALERT_PHONE;
+  if (!from || !to) return { sent: false, skipped: 'SMS off (set TWILIO_FROM and ALERT_PHONE).' };
+  return twilioSend(from, to, body);
+}
+
+export async function sendWhatsApp(body: string): Promise<{ sent: boolean; skipped?: string }> {
+  const raw = process.env.ALERT_WHATSAPP;
+  if (!raw) return { sent: false, skipped: 'WhatsApp off (set ALERT_WHATSAPP).' };
+  const num = raw.replace(/^whatsapp:/, '');
+  const from = process.env.TWILIO_WHATSAPP_FROM || 'whatsapp:+14155238886';
+  return twilioSend(from.startsWith('whatsapp:') ? from : `whatsapp:${from}`, `whatsapp:${num}`, body);
+}
+
 export async function notifyApproval(n: ApprovalNotice): Promise<void> {
   const title = `Approval needed: ${BRAND_LABEL[n.brand] ?? n.brand} · ${n.platform}`;
   const body = n.title;
-  // ntfy first (main channel), browser push as a second channel.
-  await Promise.allSettled([sendNtfy(title, body, { brand: n.brand, priority: 'high' }), sendPushToAll({ title, body, url: '/approvals', tag: 'agency-approval' })]);
+  // SMS + ntfy (phone), browser push as a third channel.
+  await Promise.allSettled([sendSms(`${title}: ${body}`), sendWhatsApp(`${title}: ${body}`), sendNtfy(title, body, { brand: n.brand, priority: 'high' }), sendPushToAll({ title, body, url: '/approvals', tag: 'agency-approval' })]);
 }
