@@ -6,6 +6,28 @@ export const BRANDS = ['visions4u', 'build_catalyst', 'silverfoxx2u'] as const;
 export const PLATFORMS = ['facebook', 'instagram', 'tiktok', 'youtube', 'linkedin', 'email', 'sms', 'website', 'other'] as const;
 
 export const DATA_TOOL_SCHEMAS: Record<string, LLMTool> = {
+  content_list_files: {
+    name: 'content_list_files',
+    description:
+      "List the files in Jevon's private content library (photos, videos, scripts, brand notes he uploaded on the Upload page). Use it to see what source material exists before drafting.",
+    input_schema: {
+      type: 'object',
+      properties: { max_results: { type: 'number', description: '1 to 100 (default 50)' } },
+    },
+  },
+  content_read_file: {
+    name: 'content_read_file',
+    description:
+      'Read a file from the content library by its exact name from content_list_files. Text files (.txt .md .csv .json .html .srt) return their contents; photos and videos return a 7-day link instead.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'Exact file name from content_list_files' },
+        max_chars: { type: 'number', description: '500 to 60000 (default 20000)' },
+      },
+      required: ['name'],
+    },
+  },
   youtube_search_videos: {
     name: 'youtube_search_videos',
     description:

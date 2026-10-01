@@ -1,106 +1,83 @@
 "use client";
 // components/UploadCenter.tsx
-import React, { useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
+// Upload photos, videos and notes to the private content library the agents read from.
+import React, { useCallback, useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
+import { authFetch } from "@/lib/agency/authFetch";
+
+const BUCKET = "agency-content";
+interface Item { name: string; size: number | null; type: string | null }
 
 export default function UploadCenter() {
-  const [file, setFile] = useState<File | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [url, setUrl] = useState<string>("");
-  const [error, setError] = useState<string>("");
+  const [files, setFiles] = useState<File[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [items, setItems] = useState<Item[]>([]);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
-    }
-  };
+  const load = useCallback(async () => {
+    const res = await authFetch("/api/agency/content");
+    const body = await res.json().catch(() => ({}));
+    if (res.ok) setItems((body as { files: Item[] }).files);
+    else setMsg((body as { error?: string }).error || "Could not load the library.");
+  }, []);
+  useEffect(() => { load().catch(() => undefined); }, [load]);
 
-  const uploadFile = async () => {
-    if (!file) return;
-    setUploading(true);
-    setError("");
-    setUrl("");
-    
+  const upload = async () => {
+    setBusy(true);
+    setMsg("");
+    let done = 0;
     try {
-      const fileName = `${Date.now()}_${file.name}`;
-      
-      // Try uploading directly from the client to Supabase Storage (bypasses Vercel 4.5MB limit)
-      const { data, error: uploadError } = await supabase.storage
-        .from("uploads")
-        .upload(fileName, file, {
-          cacheControl: "3600",
-          upsert: false,
-          contentType: file.type
+      for (const f of files) {
+        setMsg(`Uploading ${f.name} (${done + 1}/${files.length})...`);
+        const res = await authFetch("/api/agency/content", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ name: f.name }),
         });
-
-      if (uploadError) {
-        // If the bucket doesn't exist, call the server initialization route to create it, then retry
-        if (uploadError.message.includes("bucket") || uploadError.message.includes("not found")) {
-          setError("Initializing storage bucket... Please wait.");
-          const initRes = await fetch("/api/upload", {
-            method: "POST"
-          });
-          
-          if (initRes.ok) {
-            setError("Uploading file...");
-            const { data: retryData, error: retryError } = await supabase.storage
-              .from("uploads")
-              .upload(fileName, file, {
-                cacheControl: "3600",
-                upsert: false,
-                contentType: file.type
-              });
-              
-            if (retryError) throw retryError;
-            
-            const { data: publicUrlData } = supabase.storage.from("uploads").getPublicUrl(fileName);
-            setUrl(publicUrlData.publicUrl);
-            setError("");
-          } else {
-            throw new Error("Could not initialize the uploads bucket on the server.");
-          }
-        } else {
-          throw uploadError;
-        }
-      } else {
-        const { data: publicUrlData } = supabase.storage.from("uploads").getPublicUrl(fileName);
-        setUrl(publicUrlData.publicUrl);
+        const body = (await res.json().catch(() => ({}))) as { path?: string; token?: string; error?: string };
+        if (!res.ok || !body.path || !body.token) throw new Error(body.error || "Could not start the upload.");
+        const { error } = await supabase.storage.from(BUCKET).uploadToSignedUrl(body.path, body.token, f, { contentType: f.type || undefined });
+        if (error) throw new Error(error.message);
+        done++;
       }
-    } catch (e: any) {
-      setError(`Upload error: ${e.message || e}`);
+      setMsg(`Uploaded ${done} file${done === 1 ? "" : "s"}. The agents can use them now.`);
+      setFiles([]);
+      await load();
+    } catch (e) {
+      setMsg(`Upload error: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
-      setUploading(false);
+      setBusy(false);
     }
   };
 
   return (
-    <div className="p-6 bg-glass rounded-lg shadow-glow max-w-md mx-auto">
-      <h2 className="text-2xl font-semibold mb-4 text-primary">Upload a file</h2>
+    <div className="p-6 bg-glass rounded-lg shadow-glow w-full max-w-md mx-auto">
+      <h2 className="text-2xl font-semibold mb-2 text-primary">Content library</h2>
       <p className="text-xs text-gray-400 mb-4 leading-relaxed">
-        Direct client-to-storage upload enabled. Bypasses server payload limits (suitable for large media files).
+        Private. Upload photos, videos, scripts and brand notes here. Your agents can list and read them.
       </p>
       <input
         type="file"
-        onChange={handleFileChange}
+        multiple
+        onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
         className="border border-gray-300 rounded p-2 mb-4 w-full text-white text-sm"
-        disabled={uploading}
+        disabled={busy}
       />
       <button
-        onClick={uploadFile}
-        disabled={uploading || !file}
-        className="bg-primary text-white px-4 py-2 rounded hover:opacity-90 transition w-full font-medium"
+        onClick={upload}
+        disabled={busy || files.length === 0}
+        className="bg-primary text-white px-4 py-2 rounded hover:opacity-90 transition w-full font-medium disabled:opacity-50"
       >
-        {uploading ? "Uploading..." : "Upload"}
+        {busy ? "Uploading..." : `Upload${files.length ? ` ${files.length} file${files.length === 1 ? "" : "s"}` : ""}`}
       </button>
-      {url && (
-        <div className="mt-4">
-          <p className="text-sm text-foreground">File URL:</p>
-          <a href={url} target="_blank" rel="noopener noreferrer" className="text-accent underline break-all text-sm">
-            {url}
-          </a>
-        </div>
+      {msg && <p className="mt-3 text-sm text-gray-300">{msg}</p>}
+      {items.length > 0 && (
+        <ul className="mt-4 space-y-1 text-xs text-gray-300 max-h-64 overflow-auto">
+          {items.map((i) => (
+            <li key={i.name} className="truncate">{i.name.replace(/^\d+_/, "")}{i.size ? ` · ${(i.size / 1024 / 1024).toFixed(1)} MB` : ""}</li>
+          ))}
+        </ul>
       )}
-      {error && <p className="mt-2 text-red-500 text-sm">{error}</p>}
     </div>
   );
 }

@@ -42,3 +42,4 @@ next-env.d.ts
 
 # local helper scripts that touch secrets
 setup-env.sh
+_to_delete/

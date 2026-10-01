@@ -9,6 +9,7 @@ import { isIP } from 'node:net';
 import { getServiceClient } from './serverSupabase';
 import { BRANDS, PLATFORMS } from './dataToolSchemas';
 import { notifyApproval } from './notify';
+import { listContent, readContent } from './content';
 
 export interface ToolContext {
   agentId: string;
@@ -519,7 +520,19 @@ const agency_doctor: Impl = async (_input, ctx) => {
   };
 };
 
+const content_list_files: Impl = async (input) => {
+  const files = await listContent('', numIn(input.max_results, 50, 1, 100));
+  return { count: files.length, files };
+};
+const content_read_file: Impl = async (input) => {
+  const name = str(input.name, 300);
+  if (!name) throw new Error('name is required.');
+  return { ...(await readContent(name, numIn(input.max_chars, 20000, 500, 60000))) };
+};
+
 export const DATA_TOOLS: Record<string, Impl> = {
+  content_list_files,
+  content_read_file,
   agency_doctor,
   youtube_search_videos,
   youtube_channel_stats,

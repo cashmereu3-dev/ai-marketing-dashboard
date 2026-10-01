@@ -28,9 +28,9 @@ export const TOOL_GRANTS: Record<string, string[]> = {
   title_ctr_optimizer: ['youtube_search_videos'],
   tag_keyword_clusterer: ['youtube_search_videos'],
   playlist_endscreen_strategist: ['youtube_channel_stats'],
-  community_engagement_catalyst: ['queue_for_approval'],
-  multiplatform_syndicate: ['queue_for_approval'],
-  shorts_hook_extractor: ['queue_for_approval'],
+  community_engagement_catalyst: ['content_list_files', 'content_read_file', 'queue_for_approval'],
+  multiplatform_syndicate: ['content_list_files', 'content_read_file', 'queue_for_approval'],
+  shorts_hook_extractor: ['content_list_files', 'content_read_file', 'queue_for_approval'],
   vertical_reframing_director: ['cloudinary_list_videos', 'render_video_clip'],
   kinetic_captioner: ['render_video_clip'],
   loop_specialist: ['render_video_clip'],
@@ -44,15 +44,15 @@ export const TOOL_GRANTS: Record<string, string[]> = {
   // ── Visions4U ────────────────────────────────────────────────
   v4u_intake_routing: ['queue_for_approval'],
   v4u_scheduling: ['queue_for_approval'],
-  v4u_deliverables_handoff: ['queue_for_approval'],
+  v4u_deliverables_handoff: ['content_list_files', 'content_read_file', 'queue_for_approval'],
   v4u_architecture_review: ['fetch_web_page'],
-  v4u_trend_strategy: ['youtube_search_videos', 'facebook_page_insights', 'fetch_web_page', 'summarize_series'],
-  v4u_social_content: ['queue_for_approval', 'compute_engagement_rate'],
-  v4u_campaign_executor: ['queue_for_approval', 'facebook_page_insights'],
+  v4u_trend_strategy: ['content_list_files', 'content_read_file', 'youtube_search_videos', 'facebook_page_insights', 'fetch_web_page', 'summarize_series'],
+  v4u_social_content: ['content_list_files', 'content_read_file', 'queue_for_approval', 'compute_engagement_rate'],
+  v4u_campaign_executor: ['content_list_files', 'content_read_file', 'queue_for_approval', 'facebook_page_insights'],
   v4u_community_engagement: ['queue_for_approval', 'facebook_page_insights'],
 
   // ── Build Catalyst ───────────────────────────────────────────
-  bc_ai_business_audit: ['fetch_web_page', 'queue_for_approval'],
+  bc_ai_business_audit: ['content_list_files', 'content_read_file', 'fetch_web_page', 'queue_for_approval'],
   bc_insight_extraction: ['facebook_page_insights', 'youtube_channel_stats', 'spotify_artist_lookup', 'summarize_series', 'compute_growth_rate'],
 
   // ── Silverfoxx2u Music ───────────────────────────────────────
@@ -67,8 +67,8 @@ export const TOOL_GRANTS: Record<string, string[]> = {
     'compute_growth_rate',
     'summarize_series',
   ],
-  sf_social_viral: ['youtube_search_videos', 'queue_for_approval'],
-  sf_content_clipping: ['cloudinary_list_videos', 'render_video_clip', 'queue_for_approval'],
+  sf_social_viral: ['content_list_files', 'content_read_file', 'youtube_search_videos', 'queue_for_approval'],
+  sf_content_clipping: ['content_list_files', 'content_read_file', 'cloudinary_list_videos', 'render_video_clip', 'queue_for_approval'],
   sf_platform_distribution: ['queue_for_approval'],
   sf_crm_fan_engagement: ['queue_for_approval'],
 };
