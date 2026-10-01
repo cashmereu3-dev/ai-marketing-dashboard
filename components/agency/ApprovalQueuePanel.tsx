@@ -69,6 +69,8 @@ export default function ApprovalQueuePanel() {
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error((body as { error?: string }).error || 'Could not save your decision.');
       setItems((prev) => prev.filter((i) => i.id !== id));
+      const note = (body as { publishNote?: string }).publishNote;
+      if (status === 'approved' && note) setError(note);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not save your decision.');
     } finally {
@@ -80,7 +82,7 @@ export default function ApprovalQueuePanel() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="text-sm text-zinc-400">
-          Drafts the agents prepared. Approving records your decision; it does not publish by itself.
+          Drafts the agents prepared. Approving posts Facebook drafts for you (other platforms stay approved for you to post).
         </div>
         <button onClick={load} disabled={loading} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-white disabled:opacity-50 cursor-pointer">
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /> Refresh

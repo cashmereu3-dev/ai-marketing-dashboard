@@ -15,5 +15,14 @@ for target in production preview development; do
   printf '%s' "$SUPABASE_SERVICE_ROLE_KEY"     | npx vercel env add SUPABASE_SERVICE_ROLE_KEY     "$target" --scope "$VERCEL_SCOPE"
 done
 
+# Optional vars: pushed only when set in .env.local
+for name in ANTHROPIC_API_KEY GEMINI_API_KEY AGENCY_PROVIDER AGENCY_GEMINI_MODEL NTFY_TOPIC NTFY_SERVER NTFY_TOKEN NEXT_PUBLIC_APP_URL NEXT_PUBLIC_VAPID_PUBLIC_KEY VAPID_PRIVATE_KEY VAPID_SUBJECT YOUTUBE_API_KEY FACEBOOK_PAGE_ID FACEBOOK_PAGE_ACCESS_TOKEN SPOTIFY_CLIENT_ID SPOTIFY_CLIENT_SECRET CLOUDINARY_CLOUD_NAME CLOUDINARY_API_KEY CLOUDINARY_API_SECRET AGENCY_ALLOWED_EMAILS; do
+  val="${!name:-}"
+  [ -z "$val" ] && continue
+  for target in production preview development; do
+    printf '%s' "$val" | npx vercel env add "$name" "$target" --scope "$VERCEL_SCOPE" --force
+  done
+done
+
 echo "Redeploying to apply variables..."
 npx vercel --prod --yes --scope "$VERCEL_SCOPE"

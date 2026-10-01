@@ -24,6 +24,14 @@ export default function EnableNotifications() {
   const [state, setState] = useState<State>('checking');
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [ntfy, setNtfy] = useState<{ configured: boolean; topic?: string; server?: string } | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      const res = await fetch('/api/agency/push', { headers: await authHeaders() });
+      if (res.ok) setNtfy(((await res.json()) as { ntfy: { configured: boolean; topic?: string; server?: string } }).ntfy);
+    })().catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -76,7 +84,8 @@ export default function EnableNotifications() {
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error((body as { error?: string }).error || 'Test failed.');
-      setMessage(`Test sent to ${(body as { sent: number }).sent} device(s).`);
+      const b = body as { sent: number; ntfy?: boolean };
+      setMessage(`Test sent${b.ntfy ? ' to the ntfy app' : ''}${b.sent ? ` and ${b.sent} browser device(s)` : ''}.`);
     } catch (e) {
       setMessage(e instanceof Error ? e.message : 'Test failed.');
     } finally {
@@ -84,9 +93,33 @@ export default function EnableNotifications() {
     }
   };
 
-  if (state === 'checking') return null;
+  const ntfyCard = ntfy && (
+    <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4 space-y-2">
+      <p className="text-sm font-bold text-white flex items-center gap-2"><BellRing className="w-4 h-4 text-red-500" /> Main phone alerts (ntfy app)</p>
+      {ntfy.configured ? (
+        <>
+          <ol className="text-sm text-zinc-300 list-decimal pl-5 space-y-1">
+            <li>Install the free <b>ntfy</b> app (Google Play or App Store).</li>
+            <li>Tap <b>+</b>, then enter this topic{ntfy.server && ntfy.server !== 'https://ntfy.sh' ? ` on server ${ntfy.server}` : ''}:</li>
+          </ol>
+          <code className="block break-all rounded-lg bg-zinc-950 border border-zinc-800 px-3 py-2 text-xs text-emerald-300 select-all">{ntfy.topic}</code>
+          <div className="flex items-center gap-2">
+            <a href={`${ntfy.server ?? 'https://ntfy.sh'}/${ntfy.topic}`} className="text-xs text-zinc-400 underline">Open topic page</a>
+            <button onClick={sendTest} disabled={busy} className="ml-auto px-3 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-bold disabled:opacity-50 cursor-pointer">Send test</button>
+          </div>
+        </>
+      ) : (
+        <p className="text-sm text-amber-300">Not set up yet: add NTFY_TOPIC in Vercel (run scripts/finish-setup.sh) and redeploy.</p>
+      )}
+      {message && <p className="text-xs text-zinc-400">{message}</p>}
+    </div>
+  );
+
+  if (state === 'checking') return ntfyCard || null;
 
   return (
+    <div className="space-y-3">
+      {ntfyCard}
     <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4 space-y-3">
       {state === 'unsupported' && (
         <p className="text-sm text-zinc-400">
@@ -112,7 +145,8 @@ export default function EnableNotifications() {
           </button>
         </div>
       )}
-      {message && <p className="text-xs text-zinc-400">{message}</p>}
+      {!ntfy?.configured && message && <p className="text-xs text-zinc-400">{message}</p>}
+    </div>
     </div>
   );
 }

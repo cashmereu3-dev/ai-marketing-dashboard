@@ -3,11 +3,19 @@
 import { NextResponse } from 'next/server';
 import { requireUser } from '@/lib/agency/auth';
 import { getServiceClient } from '@/lib/agency/serverSupabase';
-import { sendPushToAll } from '@/lib/agency/notify';
+import { sendPushToAll, sendNtfy, ntfyInfo } from '@/lib/agency/notify';
 
 export const runtime = 'nodejs';
 
 const MISSING = /does not exist|schema cache|PGRST205|42P01/i;
+
+// Tells the phone page how to subscribe to the main (ntfy) alerts.
+export async function GET(req: Request) {
+  const auth = await requireUser(req);
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
+  const info = ntfyInfo();
+  return NextResponse.json({ ntfy: info.configured ? { configured: true, topic: info.topic, server: info.server } : { configured: false } });
+}
 
 export async function POST(req: Request) {
   const auth = await requireUser(req);
@@ -21,9 +29,12 @@ export async function POST(req: Request) {
   }
 
   if (body.action === 'test') {
-    const r = await sendPushToAll({ title: 'The Agency', body: 'Notifications are working. Approvals will show up here.', url: '/approvals', tag: 'agency-test' });
-    if (r.skipped) return NextResponse.json({ error: `Could not send: ${r.skipped}` }, { status: 503 });
-    return NextResponse.json(r);
+    const [n, r] = await Promise.all([
+      sendNtfy('The Agency', 'Notifications are working. Approvals will show up here.'),
+      sendPushToAll({ title: 'The Agency', body: 'Notifications are working. Approvals will show up here.', url: '/approvals', tag: 'agency-test' }),
+    ]);
+    if (!n.sent && r.skipped) return NextResponse.json({ error: `Could not send. ntfy: ${n.skipped}. Browser push: ${r.skipped}` }, { status: 503 });
+    return NextResponse.json({ ntfy: n.sent, sent: r.sent, failed: r.failed });
   }
 
   const sub = body.subscription;

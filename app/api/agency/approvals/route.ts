@@ -1,9 +1,10 @@
 // app/api/agency/approvals/route.ts
 // List and decide the drafts agents have queued. Deciding only records Jevon's choice;
-// it never publishes anything by itself.
+// Publishing happens only here, right after Jevon taps Approve, and only for Facebook.
 import { NextResponse } from 'next/server';
 import { requireUser } from '@/lib/agency/auth';
 import { getServiceClient } from '@/lib/agency/serverSupabase';
+import { publishApproved } from '@/lib/agency/publish';
 
 export const runtime = 'nodejs';
 
@@ -53,9 +54,19 @@ export async function PATCH(req: Request) {
     .update({ status, decided_at: new Date().toISOString(), decision_note: note })
     .eq('id', id)
     .eq('status', 'pending')
-    .select('id, status')
+    .select('id, status, platform, title, content, media_url, scheduled_for')
     .maybeSingle();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!data) return NextResponse.json({ error: 'That item is no longer pending.' }, { status: 409 });
-  return NextResponse.json(data);
+  if (status !== 'approved') return NextResponse.json({ id: data.id, status: data.status });
+
+  const result = await publishApproved(data);
+  if (result.published) {
+    await getServiceClient()
+      .from('agency_approval_queue')
+      .update({ status: 'published', decision_note: `${result.scheduled ? 'Scheduled' : 'Published'} on Facebook (${result.externalId})` })
+      .eq('id', data.id);
+    return NextResponse.json({ id: data.id, status: 'published', publishNote: result.scheduled ? 'Scheduled on Facebook.' : 'Posted to Facebook.' });
+  }
+  return NextResponse.json({ id: data.id, status: 'approved', publishNote: result.reason });
 }
