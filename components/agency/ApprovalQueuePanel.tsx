@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { supabase } from '../../lib/supabase';
+import { authFetch } from '../../lib/agency/authFetch';
 import { CheckCircle2, XCircle, RefreshCw, Inbox } from 'lucide-react';
 
 interface QueueItem {
@@ -18,12 +18,6 @@ interface QueueItem {
   agent_id: string;
 }
 
-async function authHeaders(): Promise<Record<string, string>> {
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
 export default function ApprovalQueuePanel() {
   const [items, setItems] = useState<QueueItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,7 +28,7 @@ export default function ApprovalQueuePanel() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/agency/approvals?status=pending', { headers: await authHeaders() });
+      const res = await authFetch('/api/agency/approvals?status=pending');
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error((body as { error?: string }).error || `Could not load the queue (${res.status}).`);
       setItems((body as { items: QueueItem[] }).items);
@@ -61,9 +55,9 @@ export default function ApprovalQueuePanel() {
     setBusyId(id);
     setError(null);
     try {
-      const res = await fetch('/api/agency/approvals', {
+      const res = await authFetch('/api/agency/approvals', {
         method: 'PATCH',
-        headers: { 'content-type': 'application/json', ...(await authHeaders()) },
+        headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ id, status }),
       });
       const body = await res.json().catch(() => ({}));

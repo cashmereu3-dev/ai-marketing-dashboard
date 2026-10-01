@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { supabase } from '../../lib/supabase';
+import { authFetch } from '../../lib/agency/authFetch';
 import { Bell, BellRing } from 'lucide-react';
 
 function urlBase64ToUint8Array(base64: string): Uint8Array<ArrayBuffer> {
@@ -10,12 +10,6 @@ function urlBase64ToUint8Array(base64: string): Uint8Array<ArrayBuffer> {
   const out = new Uint8Array(new ArrayBuffer(raw.length));
   for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
   return out;
-}
-
-async function authHeaders(): Promise<Record<string, string>> {
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
-  return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
 type State = 'checking' | 'unsupported' | 'off' | 'on' | 'denied';
@@ -28,7 +22,7 @@ export default function EnableNotifications() {
 
   useEffect(() => {
     (async () => {
-      const res = await fetch('/api/agency/push', { headers: await authHeaders() });
+      const res = await authFetch('/api/agency/push');
       if (res.ok) setNtfy(((await res.json()) as { ntfy: { configured: boolean; topic?: string; server?: string } }).ntfy);
     })().catch(() => undefined);
   }, []);
@@ -57,9 +51,9 @@ export default function EnableNotifications() {
       const reg = await navigator.serviceWorker.register('/sw.js');
       await navigator.serviceWorker.ready;
       const sub = (await reg.pushManager.getSubscription()) ?? (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(key) }));
-      const res = await fetch('/api/agency/push', {
+      const res = await authFetch('/api/agency/push', {
         method: 'POST',
-        headers: { 'content-type': 'application/json', ...(await authHeaders()) },
+        headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ subscription: sub.toJSON() }),
       });
       const body = await res.json().catch(() => ({}));
@@ -77,15 +71,16 @@ export default function EnableNotifications() {
     setBusy(true);
     setMessage(null);
     try {
-      const res = await fetch('/api/agency/push', {
+      const res = await authFetch('/api/agency/push', {
         method: 'POST',
-        headers: { 'content-type': 'application/json', ...(await authHeaders()) },
+        headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ action: 'test' }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error((body as { error?: string }).error || 'Test failed.');
-      const b = body as { sent: number; ntfy?: boolean };
-      setMessage(`Test sent${b.ntfy ? ' to the ntfy app' : ''}${b.sent ? ` and ${b.sent} browser device(s)` : ''}.`);
+      const b = body as { sent: number; ntfy?: boolean; whatsapp?: boolean; sms?: boolean };
+      const via = [b.whatsapp && 'WhatsApp', b.sms && 'SMS', b.ntfy && 'ntfy app', b.sent ? `${b.sent} browser device(s)` : ''].filter(Boolean).join(', ');
+      setMessage(`Test sent via ${via || 'no channel'}.`);
     } catch (e) {
       setMessage(e instanceof Error ? e.message : 'Test failed.');
     } finally {

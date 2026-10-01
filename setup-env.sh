@@ -10,9 +10,9 @@ set -euo pipefail
 export VERCEL_SCOPE="${VERCEL_SCOPE:-}"  # leave empty to use your logged-in Vercel account
 
 for target in production preview development; do
-  printf '%s' "$NEXT_PUBLIC_SUPABASE_URL"      | npx vercel env add NEXT_PUBLIC_SUPABASE_URL      "$target" ${VERCEL_SCOPE:+--scope "$VERCEL_SCOPE"}
-  printf '%s' "$NEXT_PUBLIC_SUPABASE_ANON_KEY" | npx vercel env add NEXT_PUBLIC_SUPABASE_ANON_KEY "$target" ${VERCEL_SCOPE:+--scope "$VERCEL_SCOPE"}
-  printf '%s' "$SUPABASE_SERVICE_ROLE_KEY"     | npx vercel env add SUPABASE_SERVICE_ROLE_KEY     "$target" ${VERCEL_SCOPE:+--scope "$VERCEL_SCOPE"}
+  printf '%s' "$NEXT_PUBLIC_SUPABASE_URL"      | npx vercel env add NEXT_PUBLIC_SUPABASE_URL      "$target" ${VERCEL_SCOPE:+--scope "$VERCEL_SCOPE"} --force
+  printf '%s' "$NEXT_PUBLIC_SUPABASE_ANON_KEY" | npx vercel env add NEXT_PUBLIC_SUPABASE_ANON_KEY "$target" ${VERCEL_SCOPE:+--scope "$VERCEL_SCOPE"} --force
+  printf '%s' "$SUPABASE_SERVICE_ROLE_KEY"     | npx vercel env add SUPABASE_SERVICE_ROLE_KEY     "$target" ${VERCEL_SCOPE:+--scope "$VERCEL_SCOPE"} --force
 done
 
 # Optional vars: pushed only when set in .env.local

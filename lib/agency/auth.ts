@@ -24,7 +24,10 @@ export async function requireUser(req: Request): Promise<AuthResult> {
 
   const client = createClient(url, anon, { auth: { persistSession: false, autoRefreshToken: false } });
   const { data, error } = await client.auth.getUser(token);
-  if (error || !data.user) return { ok: false, status: 401, error: 'Session expired. Please sign in again.' };
+  if (error || !data.user) {
+    console.error('[auth] getUser failed:', error?.status, error?.name, error?.message);
+    return { ok: false, status: 401, error: `Session expired. Please sign in again.${error ? ` (${error.status ?? ''} ${error.message})` : ''}` };
+  }
 
   const email = data.user.email?.toLowerCase();
   if (!email || !data.user.email_confirmed_at) {
