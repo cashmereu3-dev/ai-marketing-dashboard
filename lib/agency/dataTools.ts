@@ -438,6 +438,11 @@ const queue_for_approval: Impl = async (input, ctx) => {
   const platform = str(input.platform, 30).toLowerCase();
   if (!(BRANDS as readonly string[]).includes(brand)) throw new Error(`brand must be one of: ${BRANDS.join(', ')}.`);
   if (!(PLATFORMS as readonly string[]).includes(platform)) throw new Error(`platform must be one of: ${PLATFORMS.join(', ')}.`);
+  // Brand isolation: a brand-specific agent may only queue work for its own brand (never silently redirected).
+  const own = ctx.agentId.startsWith('v4u_') ? 'visions4u' : ctx.agentId.startsWith('bc_') ? 'build_catalyst' : ctx.agentId.startsWith('sf_') ? 'silverfoxx2u' : null;
+  if (own && own !== brand) {
+    throw new Error(`Refused: you are a ${own} agent and cannot queue work for ${brand}. Hand it to the agent or the orchestrator that owns ${brand} instead.`);
+  }
   const title = str(input.title, 120);
   const content = str(input.content, 5000);
   if (!title || !content) throw new Error('title and content are required.');
@@ -472,7 +477,50 @@ const queue_for_approval: Impl = async (input, ctx) => {
   return { queued: true, id: data?.id, status: 'pending', note: 'Waiting for Jevon to approve in The Agency > Approvals, and his phone was notified. Nothing has been published.' };
 };
 
+// ---------- doctor (read-only health check) ----------
+const KEY_REQUIREMENTS: Record<string, string[]> = {
+  youtube_search_videos: ['YOUTUBE_API_KEY'],
+  youtube_channel_stats: ['YOUTUBE_API_KEY'],
+  facebook_page_insights: ['FACEBOOK_PAGE_ID', 'FACEBOOK_PAGE_ACCESS_TOKEN'],
+  spotify_artist_lookup: ['SPOTIFY_CLIENT_ID', 'SPOTIFY_CLIENT_SECRET'],
+  cloudinary_list_videos: ['CLOUDINARY_CLOUD_NAME', 'CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET'],
+  render_video_clip: ['CLOUDINARY_CLOUD_NAME'],
+};
+
+const agency_doctor: Impl = async (_input, ctx) => {
+  const { AGENCY_AGENTS } = await import('./agentRegistry');
+  const set = (k: string) => Boolean(process.env[k]);
+  const claude = set('ANTHROPIC_API_KEY');
+  const gemini = set('GEMINI_API_KEY') || set('GOOGLE_API_KEY');
+
+  const tableOk = async (t: string) => {
+    try {
+      const { error } = await getServiceClient().from(t).select('*', { head: true, count: 'exact' }).limit(1);
+      return error ? `unavailable (${error.message.slice(0, 80)})` : 'ok';
+    } catch (e) {
+      return `unavailable (${e instanceof Error ? e.message.slice(0, 80) : 'error'})`;
+    }
+  };
+  const [queue, memory] = await Promise.all([tableOk('agency_approval_queue'), tableOk('tubeos_vector_memory')]);
+
+  const me = AGENCY_AGENTS.find((a) => a.id === ctx.agentId);
+  const tools = (me?.tools ?? []).filter((t) => t in DATA_TOOLS || t === 'queue_for_approval').map((t) => {
+    const missing = (KEY_REQUIREMENTS[t] ?? []).filter((k) => !set(k));
+    const ready = t === 'queue_for_approval' ? queue === 'ok' : missing.length === 0;
+    return { tool: t, ready, ...(missing.length ? { missing_env: missing } : {}), ...(t === 'queue_for_approval' && queue !== 'ok' ? { problem: `approval queue ${queue}` } : {}) };
+  });
+  return {
+    agent: ctx.agentId,
+    models: { claude, gemini, provider_mode: process.env.AGENCY_PROVIDER || 'auto' },
+    database: { approval_queue: queue, shared_memory: memory },
+    phone_notifications: { web_push: set('VAPID_PRIVATE_KEY') && set('NEXT_PUBLIC_VAPID_PUBLIC_KEY'), ntfy: set('NTFY_TOPIC') },
+    your_data_tools: tools,
+    guidance: 'Only rely on tools marked ready. Report anything not ready in your deliverable instead of working around it or inventing data.',
+  };
+};
+
 export const DATA_TOOLS: Record<string, Impl> = {
+  agency_doctor,
   youtube_search_videos,
   youtube_channel_stats,
   facebook_page_insights,

@@ -419,7 +419,7 @@ export const YOUTUBE_AGENTS: AgencyAgent[] = [
 /** Every agent plus the real tools it is granted in toolGrants.ts. */
 export const AGENCY_AGENTS: AgencyAgent[] = [...YOUTUBE_AGENTS, ...EMPIRE_AGENTS].map((a) => ({
   ...a,
-  tools: Array.from(new Set([...a.tools, ...(TOOL_GRANTS[a.id] ?? [])])),
+  tools: Array.from(new Set([...a.tools, 'agency_doctor', ...(TOOL_GRANTS[a.id] ?? [])])),
 }));
 
 export const AGENT_DIVISIONS: AgentDivision[] = [

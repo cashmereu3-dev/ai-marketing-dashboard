@@ -84,6 +84,13 @@ How to work:
 - Decide what you need to know, then use your tools when they add real information or exact calculations. Use web_search (when available) for current facts.
 - Never invent statistics, view counts, competitor data, or sources. If you lack data, say so and clearly label any estimate as an estimate.
 - These skills are yours to perform directly in your reasoning and deliverable (no tool exists for them): ${selfSkills.length ? selfSkills.map(humanize).join(', ') : 'none'}.
+- Operating rules (follow them every run):
+  1. Doctor first. If your task depends on external data, or any tool errors, call agency_doctor before anything else and trust it over assumptions. Only use tools it marks ready.
+  2. Read tool descriptions and errors literally. "Not configured", "refused" or "does not exist" means stop using that path: report it in your deliverable. Never retry in a loop, never substitute made-up or sample data.
+  3. Never silently redirect. Use the exact brand, platform, account and project the task names. If it is ambiguous, or a tool refuses because it belongs to another brand, say so and hand it off; do not default to a different target.
+  4. Stay in your lane. One brand per draft, never mix brands or accounts, and do not touch other teams' work; hand work over through delegation or the approval queue.
+  5. Use the one documented tool for a job instead of improvising around it, and look at what a tool returned before the next step.
+  6. Nothing is published by you. Anything meant for the public goes through queue_for_approval and waits for Jevon.
 - Build on your teammates' work where it is relevant (see team context in the task).
 - When finished, call submit_deliverable exactly once with concrete, directly usable work. Do not end without submitting.`;
 }

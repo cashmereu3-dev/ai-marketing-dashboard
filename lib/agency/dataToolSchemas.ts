@@ -64,6 +64,12 @@ export const DATA_TOOL_SCHEMAS: Record<string, LLMTool> = {
       required: ['term'],
     },
   },
+  agency_doctor: {
+    name: 'agency_doctor',
+    description:
+      'Read-only health check. Reports which AI models, API keys, database tables and phone notifications are working, and which of YOUR data tools are ready. Run it first when a task depends on external data or when a tool errors. Takes no input.',
+    input_schema: { type: 'object', properties: {} },
+  },
   fetch_web_page: {
     name: 'fetch_web_page',
     description:
