@@ -1,11 +1,14 @@
 // app/api/seed/route.ts
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { requireUser } from "@/lib/agency/auth";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://yeoceamczddelhgligmq.supabase.co";
+const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || "").replace(/[^\x21-\x7E]/g, "");
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 export async function POST(req: Request) {
+  const auth = await requireUser(req);
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
   if (!serviceRoleKey) {
     return NextResponse.json(
       { error: "SUPABASE_SERVICE_ROLE_KEY is not defined in the environment." },

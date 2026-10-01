@@ -1,11 +1,14 @@
 // app/api/upload/route.ts
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { requireUser } from "@/lib/agency/auth";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://yeoceamczddelhgligmq.supabase.co";
+const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || "").replace(/[^\x21-\x7E]/g, "");
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 export async function POST(req: Request) {
+  const auth = await requireUser(req);
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
   // Ensure "uploads" bucket exists (without size limits)
   if (serviceRoleKey) {
     try {
@@ -40,7 +43,8 @@ export async function POST(req: Request) {
     ? createClient(supabaseUrl, serviceRoleKey)
     : createClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "");
 
-  const fileName = `${Date.now()}_${file.name}`;
+  if (file.size > 25 * 1024 * 1024) return NextResponse.json({ error: "File too large (max 25MB)" }, { status: 413 });
+  const fileName = `${Date.now()}_${file.name.replace(/[^A-Za-z0-9._-]/g, "_").slice(-100)}`;
   const { data, error } = await client.storage
     .from("uploads")
     .upload(fileName, file, {

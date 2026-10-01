@@ -1,7 +1,14 @@
 import { NextResponse } from 'next/server';
+import { timingSafeEqual } from 'crypto';
 import { createClient } from '@supabase/supabase-js';
 
 export async function POST(request: Request) {
+  const secret = process.env.WEBHOOK_SECRET || process.env.CRON_SECRET || '';
+  const given = (request.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim();
+  const a = Buffer.from(given), b = Buffer.from(secret);
+  if (!secret || a.length !== b.length || !timingSafeEqual(a, b)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
   try {
     const payload = await request.json();
     const { task_type, data } = payload;

@@ -83,7 +83,7 @@ function openKey(): string | undefined {
 
 /** Real Anthropic keys start with "sk-ant-"; a placeholder would only 401 and waste time on every call. */
 function looksLikeAnthropicKey(k?: string): boolean {
-  return Boolean(k && /^sk-ant-/.test(k.trim()));
+  return Boolean(k && /^sk-ant-[A-Za-z0-9_-]{40,}$/.test(k.trim())); // a truncated key would only 401 on every call
 }
 
 export function isLiveAvailable(): boolean {
@@ -180,12 +180,12 @@ function toOpenMessages(system: string, messages: LLMMessage[]): Json[] {
   return out;
 }
 
-async function callOpen(params: LLMCallParams): Promise<LLMResponse> {
+async function callOpenWith(params: LLMCallParams, model: string): Promise<LLMResponse> {
   const apiKey = openKey();
   if (!apiKey) throw new LLMError(500, 'OPEN_LLM_API_KEY is not set on the server.');
   const tools = params.tools.filter((t) => t.input_schema).map((t) => ({ type: 'function', function: { name: t.name, description: t.description ?? '', parameters: t.input_schema } }));
   const body = JSON.stringify({
-    model: process.env.OPEN_LLM_MODEL || OPEN_MODEL,
+    model,
     messages: toOpenMessages(params.system, params.messages),
     max_tokens: params.maxTokens ?? 2500,
     ...(tools.length ? { tools, tool_choice: 'auto' } : {}),
@@ -216,4 +216,27 @@ async function callOpen(params: LLMCallParams): Promise<LLMResponse> {
     if (attempt < MAX_ATTEMPTS - 1) await backoff(attempt);
   }
   throw lastErr as LLMError;
+}
+
+// Models tried in order when the configured one is unavailable to this account (404 model_not_found).
+let workingOpenModel: string | null = null;
+export function openModelCandidates(): string[] {
+  const list = [workingOpenModel, process.env.OPEN_LLM_MODEL, OPEN_MODEL, 'openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'llama-3.1-8b-instant', 'qwen/qwen3.8-27b'];
+  return [...new Set(list.filter((m): m is string => !!m))];
+}
+
+async function callOpen(params: LLMCallParams): Promise<LLMResponse> {
+  let last: unknown = null;
+  for (const model of openModelCandidates()) {
+    try {
+      const r = await callOpenWith(params, model);
+      workingOpenModel = model;
+      return r;
+    } catch (e) {
+      last = e;
+      const missing = e instanceof LLMError && e.status === 404 && /model/i.test(e.message);
+      if (!missing) throw e;
+    }
+  }
+  throw last;
 }

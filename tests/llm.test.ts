@@ -80,4 +80,31 @@ test('tool calls round-trip: tools are sent, tool_calls come back as tool_use, r
   assert.ok(sent.messages.some((m: any) => m.role === 'tool' && m.tool_call_id === 'c1'));
 });
 
+test('unavailable model falls through to the next one, and the working model is remembered', async () => {
+  const { callClaude } = await import('../lib/agency/llm');
+  const models: string[] = [];
+  globalThis.fetch = (async (_u: unknown, init?: RequestInit) => {
+    const m = JSON.parse(String(init?.body)).model as string;
+    models.push(m);
+    return m === 'openai/gpt-oss-120b' ? ok() : new Response(JSON.stringify({ error: { message: 'The model does not exist or you do not have access to it.', code: 'model_not_found' } }), { status: 404 });
+  }) as typeof fetch;
+  const r = await callClaude(params);
+  assert.equal(r.content[0].text, 'hello');
+  assert.equal(models[models.length - 1], 'openai/gpt-oss-120b');
+  models.length = 0;
+  await callClaude(params);
+  assert.deepEqual(models, ['openai/gpt-oss-120b']); // remembered: no wasted attempts
+});
+
+test('a truncated Anthropic key is treated as unavailable (no wasted 401)', async () => {
+  process.env.AGENCY_PROVIDER = 'auto';
+  process.env.ANTHROPIC_API_KEY = 'sk-ant-api03-short';
+  const { callClaude } = await import('../lib/agency/llm');
+  const urls: string[] = [];
+  globalThis.fetch = (async (u: unknown) => { urls.push(String(u)); return ok(); }) as typeof fetch;
+  await callClaude(params);
+  assert.ok(urls.every((u) => !u.includes('anthropic.com')));
+  process.env.AGENCY_PROVIDER = 'open'; delete process.env.ANTHROPIC_API_KEY;
+});
+
 test.after(() => { globalThis.fetch = realFetch; });

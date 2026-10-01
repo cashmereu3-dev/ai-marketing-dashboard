@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { authFetch } from "@/lib/agency/authFetch";
 import { Settings, User, Key, Database, Check, Loader2, Play } from "lucide-react";
 
 export default function SettingsPage() {
@@ -75,7 +76,7 @@ export default function SettingsPage() {
     setSeedError("");
     
     try {
-      const res = await fetch("/api/seed", {
+      const res = await authFetch("/api/seed", {
         method: "POST"
       });
       const data = await res.json();
