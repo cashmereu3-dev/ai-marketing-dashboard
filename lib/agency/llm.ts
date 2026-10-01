@@ -140,6 +140,11 @@ function toGeminiSchema(node: unknown): unknown {
       continue;
     }
     if (k === 'enum' && Array.isArray(v)) { out.enum = v.map(String); continue; }
+    if (k === 'properties' && v && typeof v === 'object' && !Array.isArray(v)) {
+      // Property NAMES (e.g. a property called "title") are not schema keywords; never strip them.
+      out.properties = Object.fromEntries(Object.entries(v as Json).map(([name, def]) => [name, toGeminiSchema(def)]));
+      continue;
+    }
     out[k] = toGeminiSchema(v);
   }
   return out;
