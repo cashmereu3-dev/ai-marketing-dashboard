@@ -64,3 +64,59 @@ export async function publishApproved(item: QueueItem): Promise<PublishResult> {
     return { published: false, reason: e instanceof Error ? e.message : 'Facebook publish failed.' };
   }
 }
+
+// ---- Autonomous publishers used by the Quote agents (no human tap; the owner turned autonomous mode on) ----
+
+/** Looks at the Page's latest posts to see whether a post with this text already went out (used before any retry). */
+export async function facebookHasPost(text: string): Promise<string | null> {
+  const pageId = process.env.FACEBOOK_PAGE_ID, token = process.env.FACEBOOK_PAGE_ACCESS_TOKEN;
+  if (!pageId || !token) return null;
+  const ver = process.env.FACEBOOK_GRAPH_VERSION || 'v23.0';
+  try {
+    const res = await fetch(`https://graph.facebook.com/${ver}/${pageId}/posts?fields=id,message&limit=10`, { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(20000) });
+    const d = (await res.json()) as { data?: { id: string; message?: string }[] };
+    const key = text.slice(0, 60);
+    return d.data?.find((p) => (p.message || '').startsWith(key))?.id ?? null;
+  } catch { return null; }
+}
+
+export async function facebookEngagement(postId: string): Promise<{ likes: number; comments: number; shares: number } | null> {
+  const token = process.env.FACEBOOK_PAGE_ACCESS_TOKEN;
+  if (!token) return null;
+  const ver = process.env.FACEBOOK_GRAPH_VERSION || 'v23.0';
+  try {
+    const res = await fetch(`https://graph.facebook.com/${ver}/${postId}?fields=likes.summary(true).limit(0),comments.summary(true).limit(0),shares`, { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(20000) });
+    if (!res.ok) return null;
+    const d = (await res.json()) as { likes?: { summary?: { total_count?: number } }; comments?: { summary?: { total_count?: number } }; shares?: { count?: number } };
+    return { likes: d.likes?.summary?.total_count ?? 0, comments: d.comments?.summary?.total_count ?? 0, shares: d.shares?.count ?? 0 };
+  } catch { return null; }
+}
+
+export function linkedinConfigured(): boolean {
+  return Boolean(process.env.LINKEDIN_ACCESS_TOKEN && process.env.LINKEDIN_AUTHOR_URN);
+}
+
+/** Posts text to LinkedIn through the official UGC Posts API. Needs LINKEDIN_ACCESS_TOKEN (w_member_social) and LINKEDIN_AUTHOR_URN. */
+export async function publishLinkedIn(text: string): Promise<PublishResult> {
+  if (!linkedinConfigured()) return { published: false, reason: 'LinkedIn is not connected (LINKEDIN_ACCESS_TOKEN / LINKEDIN_AUTHOR_URN are not set).' };
+  try {
+    const res = await fetch('https://api.linkedin.com/v2/ugcPosts', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${process.env.LINKEDIN_ACCESS_TOKEN}`, 'Content-Type': 'application/json', 'X-Restli-Protocol-Version': '2.0.0' },
+      body: JSON.stringify({
+        author: process.env.LINKEDIN_AUTHOR_URN,
+        lifecycleState: 'PUBLISHED',
+        specificContent: { 'com.linkedin.ugc.ShareContent': { shareCommentary: { text }, shareMediaCategory: 'NONE' } },
+        visibility: { 'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC' },
+      }),
+      signal: AbortSignal.timeout(30000),
+    });
+    const body = (await res.json().catch(() => ({}))) as { id?: string; message?: string };
+    if (!res.ok) return { published: false, reason: body.message || `LinkedIn responded ${res.status}` };
+    const id = res.headers.get('x-restli-id') || body.id;
+    if (!id) return { published: false, reason: 'LinkedIn accepted the request but returned no post id.' };
+    return { published: true, externalId: id, scheduled: false };
+  } catch (e) {
+    return { published: false, reason: e instanceof Error ? e.message : 'LinkedIn publish failed.' };
+  }
+}

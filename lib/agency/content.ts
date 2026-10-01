@@ -31,6 +31,7 @@ export async function listContent(prefix = '', max = 100): Promise<ContentFile[]
     if (error) throw new Error(error.message);
     for (const f of data ?? []) {
       if (out.length >= max) return;
+      if (!dir && f.name === '_system') continue; // internal settings, not content
       const name = dir ? `${dir}/${f.name}` : f.name;
       if (f.id) {
         out.push({
