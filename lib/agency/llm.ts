@@ -80,8 +80,13 @@ function geminiKey(): string | undefined {
   return process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || undefined;
 }
 
+/** Real Anthropic keys start with "sk-ant-"; a placeholder would only 401 and waste time on every call. */
+function looksLikeAnthropicKey(k?: string): boolean {
+  return Boolean(k && /^sk-ant-/.test(k.trim()));
+}
+
 export function isLiveAvailable(): boolean {
-  return Boolean(process.env.ANTHROPIC_API_KEY || geminiKey());
+  return Boolean(looksLikeAnthropicKey(process.env.ANTHROPIC_API_KEY) || geminiKey());
 }
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -97,11 +102,12 @@ export interface LLMCallParams {
 // Entry point used by the agent runner (name kept for compatibility): routes to Claude or Gemini.
 export async function callClaude(params: LLMCallParams): Promise<LLMResponse> {
   const mode = (process.env.AGENCY_PROVIDER || 'auto').toLowerCase();
-  const hasClaude = Boolean(process.env.ANTHROPIC_API_KEY);
+  const hasClaude = looksLikeAnthropicKey(process.env.ANTHROPIC_API_KEY);
   const hasGemini = Boolean(geminiKey());
 
   if (mode === 'gemini') return callGemini(params);
   if (mode === 'anthropic') return callAnthropic(params);
+  if (!hasClaude && hasGemini) return callGemini(params);
   if (!hasClaude && hasGemini) return callGemini(params);
   if (!hasClaude) throw new LLMError(500, 'No AI key set: add ANTHROPIC_API_KEY and/or GEMINI_API_KEY on the server.');
   try {
@@ -211,10 +217,21 @@ function toGeminiContents(messages: LLMMessage[]): Json[] {
   return contents;
 }
 
+/** If the primary Gemini model stays overloaded, one more try on a second model (same provider, same key). */
 async function callGemini(params: LLMCallParams): Promise<LLMResponse> {
+  const primary = process.env.AGENCY_GEMINI_MODEL || GEMINI_MODEL;
+  const fallback = process.env.AGENCY_GEMINI_FALLBACK_MODEL || 'gemini-2.5-flash';
+  try {
+    return await callGeminiModel(params, primary, MAX_ATTEMPTS);
+  } catch (e) {
+    if (e instanceof LLMError && e.retryable && fallback && fallback !== primary) return callGeminiModel(params, fallback, 2);
+    throw e;
+  }
+}
+
+async function callGeminiModel(params: LLMCallParams, model: string, attempts: number): Promise<LLMResponse> {
   const apiKey = geminiKey();
   if (!apiKey) throw new LLMError(500, 'GEMINI_API_KEY is not set on the server.');
-  const model = process.env.AGENCY_GEMINI_MODEL || GEMINI_MODEL;
 
   const declarations = params.tools
     .filter((t) => t.input_schema) // server tools (web_search) have no schema and are Claude-only
@@ -228,7 +245,7 @@ async function callGemini(params: LLMCallParams): Promise<LLMResponse> {
   });
 
   let lastErr: LLMError | null = null;
-  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+  for (let attempt = 0; attempt < attempts; attempt++) {
     let res: Response;
     try {
       res = await timedFetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
@@ -239,7 +256,7 @@ async function callGemini(params: LLMCallParams): Promise<LLMResponse> {
     } catch (e) {
       if (!(e instanceof LLMError)) throw e;
       lastErr = e;
-      if (attempt < MAX_ATTEMPTS - 1) await backoff(attempt);
+      if (attempt < attempts - 1) await backoff(attempt);
       continue;
     }
     if (res.ok) {
@@ -271,7 +288,7 @@ async function callGemini(params: LLMCallParams): Promise<LLMResponse> {
     const text = (await res.text()).slice(0, 600);
     lastErr = new LLMError(res.status, `Gemini API ${res.status}: ${text}`);
     if (!lastErr.retryable) break;
-    if (attempt < MAX_ATTEMPTS - 1) await backoff(attempt);
+    if (attempt < attempts - 1) await backoff(attempt);
   }
   throw lastErr as LLMError;
 }

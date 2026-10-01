@@ -25,7 +25,27 @@ test('persistent 503 gives up after a sane maximum and is classified transient',
   let calls = 0;
   globalThis.fetch = (async () => { calls++; return err(503); }) as typeof fetch;
   await assert.rejects(callClaude(params), (e: unknown) => e instanceof LLMError && e.kind === 'TRANSIENT_PROVIDER_ERROR' && e.retryable);
-  assert.equal(calls, 4);
+  assert.equal(calls, 6); // 4 on the primary model + 2 on the fallback model
+});
+
+test('an overloaded primary model falls back to a second Gemini model', async () => {
+  const { callClaude } = await import('../lib/agency/llm');
+  const urls: string[] = [];
+  globalThis.fetch = (async (u: unknown) => { urls.push(String(u)); return String(u).includes('gemini-2.5-flash') ? ok() : err(503); }) as typeof fetch;
+  const r = await callClaude(params);
+  assert.equal(r.content[0].text, 'hello');
+  assert.ok(urls.length >= 5);
+});
+
+test('a placeholder Anthropic key is ignored (goes straight to Gemini)', async () => {
+  process.env.AGENCY_PROVIDER = 'auto';
+  process.env.ANTHROPIC_API_KEY = 'apikey_placeholder';
+  const { callClaude } = await import('../lib/agency/llm');
+  const urls: string[] = [];
+  globalThis.fetch = (async (u: unknown) => { urls.push(String(u)); return ok(); }) as typeof fetch;
+  await callClaude(params);
+  assert.ok(urls.every((u) => u.includes('generativelanguage')));
+  process.env.AGENCY_PROVIDER = 'gemini'; delete process.env.ANTHROPIC_API_KEY;
 });
 
 test('a stalled provider times out instead of hanging', async () => {
