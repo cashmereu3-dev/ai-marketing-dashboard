@@ -1,6 +1,10 @@
 #!/bin/bash
 # Pushes Supabase env vars to Vercel. Secrets are read from your shell / .env.local — never hardcode them here.
 #   Usage:  set -a; source .env.local; set +a; bash setup-env.sh
+# Strip invisible/non-ASCII characters that copy-paste can add to secrets
+for v in NEXT_PUBLIC_SUPABASE_URL NEXT_PUBLIC_SUPABASE_ANON_KEY SUPABASE_SERVICE_ROLE_KEY; do
+  export "$v=$(printf '%s' "${!v}" | LC_ALL=C tr -cd '\041-\176')"
+done
 set -euo pipefail
 
 : "${NEXT_PUBLIC_SUPABASE_URL:?Set NEXT_PUBLIC_SUPABASE_URL}"
