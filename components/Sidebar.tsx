@@ -1,9 +1,11 @@
 import Link from "next/link";
-import { LayoutDashboard, Music, Leaf, Video, Settings, Upload, MessageSquare, Users } from "lucide-react";
+import SignOutButton from "@/components/SignOutButton";
+import { Bell, LayoutDashboard, Music, Leaf, Video, Settings, Upload, MessageSquare, Users } from "lucide-react";
 
 export default function Sidebar() {
   const navItems = [
-    { name: "TubeOS (36-Agent)", href: "/tubeos", icon: Video },
+    { name: "The Agency (55 Agents)", href: "/agency", icon: Video },
+    { name: "Approvals", href: "/approvals", icon: Bell },
     { name: "SaaS Dashboard", href: "/saas", icon: LayoutDashboard },
     { name: "Music Distribution", href: "/music", icon: Music },
     { name: "Local Landscaping", href: "/landscaping", icon: Leaf },
@@ -44,6 +46,7 @@ export default function Sidebar() {
           <Settings className="h-5 w-5 text-gray-400 group-hover:text-gray-300" />
           Settings
         </Link>
+        <SignOutButton />
       </div>
     </div>
   );

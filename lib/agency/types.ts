@@ -6,11 +6,16 @@ export type AgentDivision =
   | 'Media & Production'
   | 'Shorts & Omnichannel'
   | 'SEO & Discovery'
-  | 'Monetization & Scale';
+  | 'Monetization & Scale'
+  | 'Visions4U Operations'
+  | 'Visions4U Development'
+  | 'Visions4U Marketing'
+  | 'Build Catalyst'
+  | 'Silverfoxx2u Music';
 
 export type AgentStatus = 'idle' | 'running' | 'completed' | 'failed' | 'paused';
 
-export interface TubeAgent {
+export interface AgencyAgent {
   id: string;
   number: number;
   name: string;
@@ -24,7 +29,7 @@ export interface TubeAgent {
   outputSummary?: string;
 }
 
-export interface TubeOSProject {
+export interface AgencyProject {
   id: string;
   title: string;
   niche: string;
@@ -40,7 +45,7 @@ export interface TubeOSProject {
   seoTags?: string[];
 }
 
-export interface TubeOSExecution {
+export interface AgencyExecution {
   id: string;
   projectId: string;
   agentId: string;
@@ -51,11 +56,38 @@ export interface TubeOSExecution {
   completedAt?: string;
 }
 
-export interface TubeVectorMemory {
+export interface AgencyVectorMemory {
   id: string;
   projectId: string;
   agentId: string;
   content: string;
   metadata: Record<string, unknown>;
   createdAt: string;
+}
+
+export interface ToolInvocation {
+  toolName: string;
+  args?: Record<string, unknown>;
+  result: Record<string, unknown>;
+  durationMs?: number;
+  error?: boolean;
+}
+
+export interface AgentExecutionOutput {
+  agentId: string;
+  agentName: string;
+  agentNumber: number;
+  division: string;
+  /** Model reasoning text (live mode) or scripted steps (simulated mode). */
+  thoughtProcess: string[];
+  toolsInvoked: ToolInvocation[];
+  deliverable: Record<string, unknown>;
+  executionDurationMs: number;
+  timestamp: string;
+  /** 'live' = a real model ran the tool loop; 'simulated' = canned offline output. */
+  mode: 'live' | 'simulated';
+  model?: string;
+  steps?: number;
+  usage?: { inputTokens: number; outputTokens: number };
+  notice?: string;
 }

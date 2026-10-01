@@ -8,7 +8,7 @@
 let openaiClient: any = null;
 
 if (process.env.OPENAI_API_KEY) {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { OpenAIApi, Configuration } = require('openai');
   const configuration = new Configuration({
     apiKey: process.env.OPENAI_API_KEY,

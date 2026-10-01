@@ -1,6 +1,8 @@
-import { TubeAgent, AgentDivision } from './types';
+import { AgencyAgent, AgentDivision } from './types';
+import { EMPIRE_AGENTS } from './empireAgents';
+import { TOOL_GRANTS } from './toolGrants';
 
-export const TUBE_OS_AGENTS: TubeAgent[] = [
+export const YOUTUBE_AGENTS: AgencyAgent[] = [
   // 1. Executive Tier
   {
     id: 'tube_orchestrator',
@@ -9,7 +11,7 @@ export const TUBE_OS_AGENTS: TubeAgent[] = [
     role: 'Master Commander & Autonomous Task Dispatcher',
     division: 'Executive',
     icon: 'Brain',
-    systemPrompt: `You are the Executive Master Orchestrator of TubeOS (YouTube Growth OS). You oversee 35 specialized sub-agents. When a creator provides a topic, keyword, or channel goal, you decompose it into a prioritized execution graph, delegate tasks across the 7 specialized divisions, resolve bottlenecks, and synthesize final assets into the Supabase database.`,
+    systemPrompt: `You are the Executive Master Orchestrator of The Agency, Jevon's multi-brand agent team spanning YouTube growth, Visions4U (media and marketing for local businesses), Build Catalyst (custom software and AI automation), and Silverfoxx2u (music). You oversee every other agent across all divisions. When given a topic, keyword, client, or goal, you decompose it into a prioritized execution graph, delegate to the right specialists (by agent id), resolve bottlenecks, and synthesize their work into one deliverable. Choose specialists from the division that fits the goal rather than using everyone.`,
     tools: ['delegate_to_subagent', 'read_vector_memory', 'write_vector_memory', 'get_channel_state', 'dispatch_pipeline'],
     status: 'idle'
   },
@@ -414,6 +416,12 @@ export const TUBE_OS_AGENTS: TubeAgent[] = [
   }
 ];
 
+/** Every agent plus the real tools it is granted in toolGrants.ts. */
+export const AGENCY_AGENTS: AgencyAgent[] = [...YOUTUBE_AGENTS, ...EMPIRE_AGENTS].map((a) => ({
+  ...a,
+  tools: Array.from(new Set([...a.tools, ...(TOOL_GRANTS[a.id] ?? [])])),
+}));
+
 export const AGENT_DIVISIONS: AgentDivision[] = [
   'Executive',
   'Market Intelligence',
@@ -422,5 +430,10 @@ export const AGENT_DIVISIONS: AgentDivision[] = [
   'Media & Production',
   'Shorts & Omnichannel',
   'SEO & Discovery',
-  'Monetization & Scale'
+  'Monetization & Scale',
+  'Visions4U Operations',
+  'Visions4U Development',
+  'Visions4U Marketing',
+  'Build Catalyst',
+  'Silverfoxx2u Music'
 ];

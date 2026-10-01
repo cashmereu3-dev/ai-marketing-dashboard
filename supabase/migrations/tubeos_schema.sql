@@ -63,21 +63,4 @@ ALTER TABLE public.tubeos_agents ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tubeos_executions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tubeos_vector_memory ENABLE ROW LEVEL SECURITY;
 
--- 7. Public Read & Service Role Full Access Policies
-DROP POLICY IF EXISTS "Allow read access to all" ON public.tubeos_projects;
-CREATE POLICY "Allow read access to all" ON public.tubeos_projects FOR SELECT USING (true);
-
-DROP POLICY IF EXISTS "Allow service role full access" ON public.tubeos_projects;
-CREATE POLICY "Allow service role full access" ON public.tubeos_projects FOR ALL USING (true);
-
-DROP POLICY IF EXISTS "Allow read access to all" ON public.tubeos_agents;
-CREATE POLICY "Allow read access to all" ON public.tubeos_agents FOR SELECT USING (true);
-
-DROP POLICY IF EXISTS "Allow service role full access" ON public.tubeos_agents;
-CREATE POLICY "Allow service role full access" ON public.tubeos_agents FOR ALL USING (true);
-
-DROP POLICY IF EXISTS "Allow read access to all" ON public.tubeos_executions;
-CREATE POLICY "Allow read access to all" ON public.tubeos_executions FOR SELECT USING (true);
-
-DROP POLICY IF EXISTS "Allow read access to all" ON public.tubeos_vector_memory;
-CREATE POLICY "Allow read access to all" ON public.tubeos_vector_memory FOR SELECT USING (true);
+-- 7. RLS on with NO policies: only the server (service-role key) can read/write.

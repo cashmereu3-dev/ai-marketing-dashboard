@@ -1,5 +1,5 @@
-import { TUBE_OS_AGENTS } from './agentRegistry';
-import { TubeAgent, TubeOSProject } from './types';
+import { AGENCY_AGENTS } from './agentRegistry';
+import { AgencyAgent, AgencyProject } from './types';
 import { supabase } from '../supabaseClient';
 
 export interface PipelineExecutionResult {
@@ -15,13 +15,13 @@ export interface PipelineExecutionResult {
   activeAgents: number;
 }
 
-export async function runTubeOSPipeline(
+export async function runAgencyPipeline(
   topic: string, 
   niche: string = 'Tech & Business Automation'
 ): Promise<PipelineExecutionResult> {
-  const projectId = `tubeos-${Date.now()}`;
+  const projectId = `agency-${Date.now()}`;
 
-  // 1. Simulate Executive Orchestration across the 35 specialized sub-agents
+  // 1. Simulate Executive Orchestration across the specialist sub-agents
   const titles = [
     `How I Automated a YouTube Media Empire (In 7 Days)`,
     `The YouTube Growth Secret Nobody Talks About in 2026`,
@@ -33,7 +33,7 @@ export async function runTubeOSPipeline(
   const thumbnailConcepts = [
     `Concept A (Visual Paradox): Split screen showing manual timeline with 1,000 cuts vs. clean 1-click autonomous dashboard. High contrast neon cyan/black.`,
     `Concept B (Shock Expression): Extreme close-up of creator holding head next to red declining chart that shoots violently green with +840% label.`,
-    `Concept C (Curiosity Object): Glowing black box labeled 'TubeOS Autonomous Core' connected to YouTube Studio server rack.`
+    `Concept C (Curiosity Object): Glowing black box labeled 'The Agency Autonomous Core' connected to YouTube Studio server rack.`
   ];
 
   const hookOpening = `[VISUAL: Red flashing retention curve dropping to 12%]
@@ -64,14 +64,14 @@ In this video, I'm revealing the exact 36-agent system that took this channel fr
   ];
 
   const seoTags = [
-    'youtube automation', 'tubeos', 'ai agents', 'youtube growth', 
+    'youtube automation', 'the agency', 'ai agents', 'youtube growth', 
     'retention editing', 'high ctr titles', 'youtube algorithm 2026',
     'faceless channel', 'content creation ai', 'buildateam'
   ];
 
   // 2. Persist project state in Supabase if table exists
   try {
-    const projectData: Partial<TubeOSProject> = {
+    const projectData: Partial<AgencyProject> = {
       id: projectId,
       title: topic,
       niche,
@@ -79,7 +79,7 @@ In this video, I'm revealing the exact 36-agent system that took this channel fr
       status: 'scripting',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      executivePlan: 'Executive Master Orchestrator initialized 35 specialized sub-agents across 7 divisions.',
+      executivePlan: 'Executive Master Orchestrator initialized the specialist sub-agents across all divisions.',
       titles,
       thumbnailPrompts: thumbnailConcepts,
       script: `${hookOpening}\n\n${scriptOutline}`,
@@ -88,7 +88,7 @@ In this video, I'm revealing the exact 36-agent system that took this channel fr
     };
 
     await supabase.from('campaigns').insert([{
-      name: `TubeOS: ${topic}`,
+      name: `The Agency: ${topic}`,
       client: 'Visions4U YouTube Growth OS',
       status: 'active',
       type: 'b2b_outreach', // Maps to standard schema
@@ -102,13 +102,13 @@ In this video, I'm revealing the exact 36-agent system that took this channel fr
   return {
     projectId,
     topic,
-    executiveSummary: `Executive Orchestrator successfully deployed all 35 specialized agents across Market Intelligence, Packaging, Scriptwriting, Media Production, Shorts Repurposing, SEO, and Monetization.`,
+    executiveSummary: `Executive Orchestrator coordinated the specialist agents across the YouTube growth divisions.`,
     titles,
     thumbnailConcepts,
     hookOpening,
     scriptOutline,
     shortsHooks,
     seoTags,
-    activeAgents: TUBE_OS_AGENTS.length
+    activeAgents: AGENCY_AGENTS.length
   };
 }

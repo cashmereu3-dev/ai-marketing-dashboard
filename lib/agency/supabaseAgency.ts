@@ -1,14 +1,14 @@
-// lib/tubeos/supabaseTubeOS.ts
+// lib/agency/supabaseAgency.ts
 import { supabase } from '../supabaseClient';
-import { TUBE_OS_AGENTS } from './agentRegistry';
-import { TubeAgent, TubeOSExecution, TubeVectorMemory } from './types';
+import { AGENCY_AGENTS } from './agentRegistry';
+import { AgencyAgent, AgencyExecution, AgencyVectorMemory } from './types';
 
 /**
- * Syncs the 36 agent definitions into Supabase public.tubeos_agents table.
+ * Syncs all agent definitions into Supabase public.tubeos_agents table.
  */
-export async function syncTubeOSAgentsToSupabase(): Promise<{ count: number; error?: string }> {
+export async function syncAgencyAgentsToSupabase(): Promise<{ count: number; error?: string }> {
   try {
-    const records = TUBE_OS_AGENTS.map(agent => ({
+    const records = AGENCY_AGENTS.map(agent => ({
       id: agent.id,
       number: agent.number,
       name: agent.name,
@@ -40,7 +40,7 @@ export async function syncTubeOSAgentsToSupabase(): Promise<{ count: number; err
 /**
  * Logs an individual agent execution event to Supabase.
  */
-export async function logTubeOSExecution(execution: Partial<TubeOSExecution>): Promise<void> {
+export async function logAgencyExecution(execution: Partial<AgencyExecution>): Promise<void> {
   try {
     await supabase.from('tubeos_executions').insert([{
       project_id: execution.projectId || 'tubeos-global',
@@ -59,7 +59,7 @@ export async function logTubeOSExecution(execution: Partial<TubeOSExecution>): P
 /**
  * Writes vector memory record to Supabase.
  */
-export async function writeTubeOSVectorMemory(memory: Partial<TubeVectorMemory>): Promise<void> {
+export async function writeAgencyVectorMemory(memory: Partial<AgencyVectorMemory>): Promise<void> {
   try {
     await supabase.from('tubeos_vector_memory').insert([{
       project_id: memory.projectId || 'tubeos-global',

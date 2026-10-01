@@ -1,9 +1,12 @@
 'use client';
 
 import React, { useState } from 'react';
-import { TUBE_OS_AGENTS, AGENT_DIVISIONS } from '../../lib/tubeos/agentRegistry';
-import { executeAgenticAgent, executeEntire36AgentTeam, AgentExecutionOutput } from '../../lib/tubeos/agenticRunner';
-import { TubeAgent } from '../../lib/tubeos/types';
+import { AGENCY_AGENTS, AGENT_DIVISIONS } from '../../lib/agency/agentRegistry';
+import { runAgent, runEntireTeam, getTeamAgents } from '../../lib/agency/client';
+import type { AgentExecutionOutput } from '../../lib/agency/types';
+import DeliverablesPanel from './DeliverablesPanel';
+import ApprovalQueuePanel from './ApprovalQueuePanel';
+import { AgencyAgent } from '../../lib/agency/types';
 import { 
   Play, 
   Terminal, 
@@ -26,9 +29,9 @@ import {
   ShieldCheck
 } from 'lucide-react';
 
-export default function TubeOSDashboard() {
+export default function AgencyDashboard() {
   const [selectedDivision, setSelectedDivision] = useState<string>('All');
-  const [selectedAgent, setSelectedAgent] = useState<TubeAgent>(TUBE_OS_AGENTS[0]);
+  const [selectedAgent, setSelectedAgent] = useState<AgencyAgent>(AGENCY_AGENTS[0]);
   const [topicInput, setTopicInput] = useState<string>('How I Automated a YouTube Media Empire (In 7 Days)');
   const [nicheInput, setNicheInput] = useState<string>('AI & Business Automation');
   const [customAgentInput, setCustomAgentInput] = useState<string>('');
@@ -38,27 +41,33 @@ export default function TubeOSDashboard() {
   const [isSingleRunning, setIsSingleRunning] = useState<boolean>(false);
   const [currentRunningIndex, setCurrentRunningIndex] = useState<number>(0);
   const [liveLogs, setLiveLogs] = useState<AgentExecutionOutput[]>([]);
-  const [activeTab, setActiveTab] = useState<'roster' | 'liveLogs' | 'deliverables'>('roster');
+  const [activeTab, setActiveTab] = useState<'roster' | 'liveLogs' | 'deliverables' | 'approvals'>('roster');
+  const [runError, setRunError] = useState<string | null>(null);
 
   const filteredAgents = selectedDivision === 'All' 
-    ? TUBE_OS_AGENTS 
-    : TUBE_OS_AGENTS.filter(a => a.division === selectedDivision);
+    ? AGENCY_AGENTS 
+    : AGENCY_AGENTS.filter(a => a.division === selectedDivision);
 
-  // Execute Entire 36-Agent Pipeline
+  const teamSize = getTeamAgents(selectedDivision).length;
+  const teamLabel = selectedDivision === 'All' ? `All ${AGENCY_AGENTS.length} Agents` : selectedDivision;
+
+  // Execute the selected division (or the whole Agency) as a team
   const handleRunFullTeam = async () => {
     setIsTeamRunning(true);
+    setRunError(null);
     setLiveLogs([]);
     setActiveTab('liveLogs');
     setCurrentRunningIndex(0);
 
     try {
-      await executeEntire36AgentTeam(topicInput, nicheInput, (output, index, total) => {
+      await runEntireTeam(topicInput, nicheInput, (output, index) => {
         setCurrentRunningIndex(index);
         setLiveLogs(prev => [output, ...prev]);
-      });
+      }, undefined, selectedDivision);
       setActiveTab('deliverables');
     } catch (err) {
-      console.error('Error running 36-agent team:', err);
+      console.error('Error running agent team:', err);
+      setRunError(err instanceof Error ? err.message : 'Team run failed.');
     } finally {
       setIsTeamRunning(false);
     }
@@ -68,14 +77,16 @@ export default function TubeOSDashboard() {
   const handleRunSingleAgent = async () => {
     if (!selectedAgent) return;
     setIsSingleRunning(true);
+    setRunError(null);
     const goal = customAgentInput.trim() || topicInput;
 
     try {
-      const res = await executeAgenticAgent(selectedAgent.id, goal, { niche: nicheInput });
+      const res = await runAgent(selectedAgent.id, goal, { niche: nicheInput });
       setLiveLogs(prev => [res, ...prev]);
       setActiveTab('liveLogs');
     } catch (err) {
       console.error('Error running single agent:', err);
+      setRunError(err instanceof Error ? err.message : 'Agent run failed.');
     } finally {
       setIsSingleRunning(false);
     }
@@ -83,6 +94,11 @@ export default function TubeOSDashboard() {
 
   return (
     <div className="space-y-8">
+      {runError && (
+        <div role="alert" className="rounded-xl border border-red-900/60 bg-red-950/40 px-4 py-3 text-sm text-red-300">
+          {runError}
+        </div>
+      )}
       {/* Header Banner */}
       <div className="rounded-2xl bg-gradient-to-r from-red-950 via-zinc-900 to-black p-8 border border-red-900/40 shadow-2xl relative overflow-hidden">
         <div className="absolute right-0 top-0 w-96 h-96 bg-red-600/10 rounded-full blur-3xl pointer-events-none" />
@@ -91,24 +107,24 @@ export default function TubeOSDashboard() {
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-semibold mb-3">
               <Cpu className="w-3.5 h-3.5 animate-pulse" />
-              TUBE-OS: 36 AUTONOMOUS AGENTS ACTIVE
+              THE AGENCY: {AGENCY_AGENTS.length} AUTONOMOUS AGENTS ACTIVE
             </div>
             <h1 className="text-3xl lg:text-4xl font-extrabold tracking-tight text-white">
-              YouTube Growth OS <span className="text-red-500">(TubeOS)</span>
+              The <span className="text-red-500">Agency</span>
             </h1>
             <p className="text-zinc-400 mt-2 max-w-2xl text-sm lg:text-base">
-              Fully agentic autonomous team: 1 Executive Master Orchestrator coordinating 35 specialized agents 
-              equipped with live analytical tools, reasoning loops, and Supabase vector memory.
+              One Executive Orchestrator coordinating {AGENCY_AGENTS.length - 1} specialists across YouTube growth, Visions4U,
+              Build Catalyst, and Silverfoxx2u, with reasoning loops, live tools, and Supabase vector memory.
             </p>
           </div>
 
           <div className="flex items-center gap-3">
             <div className="bg-zinc-900/80 border border-zinc-800 rounded-xl px-4 py-2.5 text-center">
-              <div className="text-2xl font-black text-white">36</div>
+              <div className="text-2xl font-black text-white">{AGENCY_AGENTS.length}</div>
               <div className="text-[11px] text-zinc-400 uppercase font-semibold">Autonomous Agents</div>
             </div>
             <div className="bg-zinc-900/80 border border-zinc-800 rounded-xl px-4 py-2.5 text-center">
-              <div className="text-2xl font-black text-red-400">8</div>
+              <div className="text-2xl font-black text-red-400">{AGENT_DIVISIONS.length}</div>
               <div className="text-[11px] text-zinc-400 uppercase font-semibold">Specialized Divisions</div>
             </div>
             <div className="bg-zinc-900/80 border border-zinc-800 rounded-xl px-4 py-2.5 text-center">
@@ -129,14 +145,14 @@ export default function TubeOSDashboard() {
           {isTeamRunning && (
             <div className="flex items-center gap-2 text-xs font-semibold text-red-400 bg-red-950/60 px-3 py-1.5 rounded-full border border-red-900/50 animate-pulse">
               <Activity className="w-4 h-4 animate-spin" />
-              Running Agent #{currentRunningIndex} of 36...
+              Running Agent {currentRunningIndex} of {teamSize}...
             </div>
           )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="md:col-span-2">
-            <label className="block text-xs uppercase font-bold text-zinc-400 mb-1.5">Channel Goal or Video Concept</label>
+            <label className="block text-xs uppercase font-bold text-zinc-400 mb-1.5">Goal, Topic or Client</label>
             <input 
               type="text"
               value={topicInput}
@@ -146,7 +162,7 @@ export default function TubeOSDashboard() {
             />
           </div>
           <div>
-            <label className="block text-xs uppercase font-bold text-zinc-400 mb-1.5">Target Niche</label>
+            <label className="block text-xs uppercase font-bold text-zinc-400 mb-1.5">Niche or Brand</label>
             <input 
               type="text"
               value={nicheInput}
@@ -162,12 +178,12 @@ export default function TubeOSDashboard() {
           <div className="space-y-1.5 pt-2">
             <div className="flex justify-between text-xs font-mono text-zinc-400">
               <span>Autonomous Team Execution Progress</span>
-              <span>{Math.round((currentRunningIndex / 36) * 100)}% ({currentRunningIndex}/36)</span>
+              <span>{Math.round((currentRunningIndex / teamSize) * 100)}% ({currentRunningIndex}/{teamSize})</span>
             </div>
             <div className="w-full bg-zinc-950 rounded-full h-2.5 overflow-hidden border border-zinc-800">
               <div 
                 className="bg-gradient-to-r from-red-600 to-red-400 h-full transition-all duration-300 rounded-full"
-                style={{ width: `${(currentRunningIndex / 36) * 100}%` }}
+                style={{ width: `${(currentRunningIndex / teamSize) * 100}%` }}
               />
             </div>
           </div>
@@ -181,7 +197,7 @@ export default function TubeOSDashboard() {
                 activeTab === 'roster' ? 'bg-zinc-800 text-white' : 'text-zinc-400 hover:text-white'
               }`}
             >
-              Agent Roster (36)
+              Agent Roster ({AGENCY_AGENTS.length})
             </button>
             <button
               onClick={() => setActiveTab('liveLogs')}
@@ -201,6 +217,15 @@ export default function TubeOSDashboard() {
               <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
               Compiled Dossier
             </button>
+            <button
+              onClick={() => setActiveTab('approvals')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                activeTab === 'approvals' ? 'bg-zinc-800 text-white' : 'text-zinc-400 hover:text-white'
+              }`}
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+              Approvals
+            </button>
           </div>
 
           <button
@@ -211,12 +236,12 @@ export default function TubeOSDashboard() {
             {isTeamRunning ? (
               <>
                 <Cpu className="w-4 h-4 animate-spin" />
-                Orchestrating 36 Agents...
+                Orchestrating {teamSize} Agents...
               </>
             ) : (
               <>
                 <Zap className="w-4 h-4 fill-white" />
-                Launch Full 36-Agent Autonomous Team
+                Launch {teamLabel} Team
               </>
             )}
           </button>
@@ -236,7 +261,7 @@ export default function TubeOSDashboard() {
                   : 'bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800'
               }`}
             >
-              All 36 Agents
+              All {AGENCY_AGENTS.length} Agents
             </button>
             {AGENT_DIVISIONS.map((div) => (
               <button
@@ -254,7 +279,7 @@ export default function TubeOSDashboard() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* 36 Agents Grid */}
+            {/* Agents Grid */}
             <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[720px] overflow-y-auto pr-1">
               {filteredAgents.map((agent) => {
                 const isSelected = selectedAgent?.id === agent.id;
@@ -382,7 +407,7 @@ export default function TubeOSDashboard() {
 
           {liveLogs.length === 0 ? (
             <div className="bg-zinc-900/40 border border-zinc-800 rounded-2xl p-12 text-center text-zinc-500">
-              No executions logged yet. Click &quot;Launch Full 36-Agent Autonomous Team&quot; or trigger an agent from the Roster.
+              No executions logged yet. Click &quot;Launch Team&quot; or trigger an agent from the Roster.
             </div>
           ) : (
             <div className="space-y-3">
@@ -395,6 +420,16 @@ export default function TubeOSDashboard() {
                       </span>
                       <h4 className="text-sm font-bold text-white">{log.agentName}</h4>
                       <span className="text-[11px] text-zinc-400 font-mono">({log.division})</span>
+                      <span
+                        className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded border ${
+                          log.mode === 'live'
+                            ? 'text-emerald-300 bg-emerald-950/60 border-emerald-900'
+                            : 'text-amber-300 bg-amber-950/60 border-amber-900'
+                        }`}
+                        title={log.notice}
+                      >
+                        {log.mode}
+                      </span>
                     </div>
                     <div className="flex items-center gap-3 text-xs text-zinc-500 font-mono">
                       <span><Clock className="w-3.5 h-3.5 inline mr-1" />{log.executionDurationMs}ms</span>
@@ -443,107 +478,11 @@ export default function TubeOSDashboard() {
         </div>
       )}
 
-      {/* TAB 3: COMPILED DOSSIER */}
-      {activeTab === 'deliverables' && (
-        <div className="bg-zinc-900/90 border border-red-500/30 rounded-2xl p-6 shadow-2xl space-y-6">
-          <div className="flex items-center justify-between border-b border-zinc-800 pb-4">
-            <div>
-              <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-red-500" />
-                Compiled YouTube Growth OS Master Blueprint
-              </h2>
-              <p className="text-xs text-zinc-400 mt-1">Topic: &quot;{topicInput}&quot; | Niche: {nicheInput}</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs bg-emerald-500/10 text-emerald-400 px-3 py-1 rounded-full border border-emerald-500/30 font-semibold">
-                36 Agents Executed & Vector Synced
-              </span>
-            </div>
-          </div>
+      {/* TAB 3: REAL AGENT DELIVERABLES */}
+      {activeTab === 'deliverables' && <DeliverablesPanel logs={liveLogs} topic={topicInput} niche={nicheInput} />}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* High CTR Titles */}
-            <div className="bg-zinc-950/80 border border-zinc-800 rounded-xl p-4 space-y-2">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-red-400 flex items-center gap-2">
-                <TrendingUp className="w-4 h-4" />
-                High-CTR Title Hypotheses (Agent #7)
-              </h3>
-              <ul className="space-y-1.5 text-xs text-zinc-300">
-                <li className="bg-zinc-900/60 p-2.5 rounded-lg border border-zinc-800 flex gap-2">
-                  <span className="text-red-400 font-bold">1.</span>
-                  <span>How I Automated a YouTube Media Empire (In 7 Days)</span>
-                </li>
-                <li className="bg-zinc-900/60 p-2.5 rounded-lg border border-zinc-800 flex gap-2">
-                  <span className="text-red-400 font-bold">2.</span>
-                  <span>The YouTube Growth Secret Nobody Talks About in 2026</span>
-                </li>
-                <li className="bg-zinc-900/60 p-2.5 rounded-lg border border-zinc-800 flex gap-2">
-                  <span className="text-red-400 font-bold">3.</span>
-                  <span>Stop Editing Videos Manually: The 36-Agent YouTube OS</span>
-                </li>
-              </ul>
-            </div>
-
-            {/* A/B Packaging */}
-            <div className="bg-zinc-950/80 border border-zinc-800 rounded-xl p-4 space-y-2">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-red-400 flex items-center gap-2">
-                <Video className="w-4 h-4" />
-                Thumbnail Testing Hypotheses (Agents #8-11)
-              </h3>
-              <div className="space-y-2 text-xs text-zinc-300">
-                <div className="bg-zinc-900/60 p-2.5 rounded-lg border border-zinc-800">
-                  <span className="font-bold text-red-400">Variant A:</span> High disbelief face + red retention chart shooting green with +840% label.
-                </div>
-                <div className="bg-zinc-900/60 p-2.5 rounded-lg border border-zinc-800">
-                  <span className="font-bold text-red-400">Variant B:</span> Split screen: 1,000 timeline cuts vs 1-Click Autonomous TubeOS terminal.
-                </div>
-              </div>
-            </div>
-
-            {/* 30s Hook */}
-            <div className="bg-zinc-950/80 border border-zinc-800 rounded-xl p-4 space-y-2">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-red-400 flex items-center gap-2">
-                <FileText className="w-4 h-4" />
-                First 30-Second Retention Hook (Agent #12)
-              </h3>
-              <div className="bg-zinc-900/60 p-3 rounded-lg border border-zinc-800 text-xs font-mono text-zinc-300 leading-relaxed">
-                [VISUAL: Flashing red retention chart plunging to 14%]<br />
-                If your videos are dying in the first 30 seconds, it is not because your topic is boring.<br />
-                [SOUND: Needle scratch + heartbeat riser]<br />
-                It is because you introduced yourself before proving the title promise.<br />
-                [VISUAL: Fast cut to green +500,000 views spike]<br />
-                In this video, I am breaking down the 36-agent autonomous system that replaced our 5-person production team.
-              </div>
-            </div>
-
-            {/* Valuation Model */}
-            <div className="bg-zinc-950/80 border border-zinc-800 rounded-xl p-4 space-y-2">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-2">
-                <DollarSign className="w-4 h-4" />
-                Channel Financial Model & Valuation (Agent #36)
-              </h3>
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div className="bg-zinc-900/60 p-2 rounded-lg border border-zinc-800">
-                  <div className="text-[10px] text-zinc-400 uppercase font-semibold">Monthly Views</div>
-                  <div className="text-sm font-bold text-white">500,000</div>
-                </div>
-                <div className="bg-zinc-900/60 p-2 rounded-lg border border-zinc-800">
-                  <div className="text-[10px] text-zinc-400 uppercase font-semibold">AdSense Run-Rate</div>
-                  <div className="text-sm font-bold text-emerald-400">$3,600 / mo</div>
-                </div>
-                <div className="bg-zinc-900/60 p-2 rounded-lg border border-zinc-800">
-                  <div className="text-[10px] text-zinc-400 uppercase font-semibold">Sponsorships</div>
-                  <div className="text-sm font-bold text-white">$11,000 / mo</div>
-                </div>
-                <div className="bg-zinc-900/60 p-2 rounded-lg border border-zinc-800">
-                  <div className="text-[10px] text-zinc-400 uppercase font-semibold">Digital ARR</div>
-                  <div className="text-sm font-bold text-emerald-400">$252,000 / yr</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* TAB 4: APPROVAL QUEUE */}
+      {activeTab === 'approvals' && <ApprovalQueuePanel />}
     </div>
   );
 }

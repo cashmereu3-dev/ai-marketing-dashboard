@@ -1,6 +1,6 @@
-// lib/tubeos/toolRegistry.ts
+// lib/agency/toolRegistry.ts
 /**
- * Executable pipeline tools bound to the 36 TubeOS agents.
+ * Executable pipeline tools bound to the The Agency's agents.
  * Provides concrete analytical calculations, formatting, scoring, and generation tools.
  */
 
@@ -11,7 +11,7 @@ export interface ToolExecutionResult {
   executionMs: number;
 }
 
-export const TUBE_OS_TOOLS: Record<string, (args: any) => Promise<Record<string, unknown>>> = {
+export const AGENCY_TOOLS: Record<string, (args: any) => Promise<Record<string, unknown>>> = {
   // --- Division 1 Tools ---
   scrape_youtube_channel: async ({ channelName, niche }: { channelName?: string; niche?: string }) => {
     return {
@@ -44,7 +44,7 @@ export const TUBE_OS_TOOLS: Record<string, (args: any) => Promise<Record<string,
         'AI agents for content creation',
         'automated video editing workflow',
         'how to increase youtube retention 2026',
-        'tubeos framework'
+        'the agency framework'
       ]
     };
   },
@@ -103,7 +103,7 @@ export const TUBE_OS_TOOLS: Record<string, (args: any) => Promise<Record<string,
         contrastColor: 'Electric Yellow on Charcoal'
       },
       variantB: {
-        hypothesis: 'Curiosity Artifact: Mystery holographic device labeled TubeOS Autonomous Engine',
+        hypothesis: 'Curiosity Artifact: Mystery holographic device labeled The Agency Autonomous Engine',
         visualElements: 'Server rack + glowing blue core + no face',
         contrastColor: 'Cyberpunk Cyan on Deep Navy'
       },
@@ -205,12 +205,12 @@ export const TUBE_OS_TOOLS: Record<string, (args: any) => Promise<Record<string,
 
   cluster_semantic_tags: async ({ topic, niche }: { topic: string; niche: string }) => {
     const tags = [
-      'youtube growth', 'youtube automation', 'tubeos', 'ai agents', 'retention editing',
+      'youtube growth', 'youtube automation', 'the agency', 'ai agents', 'retention editing',
       'high ctr thumbnail', 'youtube algorithm 2026', 'faceless channel', 'video scripting ai',
       'youtube studio analytics', 'viral hooks', 'buildateam'
     ];
     return {
-      primaryTag: 'tubeos',
+      primaryTag: 'the agency',
       semanticTagCluster: tags,
       totalCharacters: tags.join(', ').length,
       withinLimit: tags.join(', ').length <= 500
