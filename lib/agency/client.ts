@@ -21,14 +21,27 @@ export class AgentRunError extends Error {
 }
 
 export async function runAgent(agentId: string, goal: string, sharedContext: Record<string, unknown> = {}): Promise<AgentExecutionOutput> {
-  const res = await fetch('/api/agency/agent', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', ...(await authHeaders()) },
-    body: JSON.stringify({ agentId, goal, sharedContext }),
-  });
+  // Never wait forever: the server stops a run at ~240s, so give up just after that.
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), 280_000);
+  let res: Response;
+  try {
+    res = await fetch('/api/agency/agent', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', ...(await authHeaders()) },
+      body: JSON.stringify({ agentId, goal, sharedContext }),
+      signal: ctl.signal,
+    });
+  } catch (e) {
+    if (e instanceof Error && e.name === 'AbortError') throw new AgentRunError(504, 'Timed out: the agent did not finish in time. Try again, or give it a smaller task.');
+    throw new AgentRunError(0, 'Could not reach the server. Check your connection and try again.');
+  } finally {
+    clearTimeout(timer);
+  }
   if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new AgentRunError(res.status, (body as { error?: string }).error || `Agent run failed (${res.status}).`);
+    const body = (await res.json().catch(() => ({}))) as { error?: string; code?: string; retryable?: boolean };
+    const prefix = body.code === 'TRANSIENT_PROVIDER_ERROR' ? 'The AI provider is busy right now (already retried automatically). ' : body.code === 'TIMEOUT' ? 'Timed out. ' : '';
+    throw new AgentRunError(res.status, `${prefix}${body.error || `Agent run failed (${res.status}).`}`.slice(0, 500));
   }
   return (await res.json()) as AgentExecutionOutput;
 }

@@ -85,12 +85,12 @@ export async function sendNtfy(title: string, body: string, opts: { brand?: stri
 
 // Twilio message to one recipient. SMS: From = TWILIO_FROM, To = ALERT_PHONE.
 // WhatsApp: From = TWILIO_WHATSAPP_FROM (sandbox default whatsapp:+14155238886), To = ALERT_WHATSAPP.
-async function twilioSend(from: string, to: string, body: string): Promise<{ sent: boolean; skipped?: string }> {
+async function twilioSend(from: string, to: string, body: string, opts: { raw?: boolean } = {}): Promise<{ sent: boolean; skipped?: string }> {
   const sid = process.env.TWILIO_ACCOUNT_SID;
   const token = process.env.TWILIO_AUTH_TOKEN;
   if (!sid || !token) return { sent: false, skipped: 'Set TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN.' };
   const base = (process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/$/, '');
-  const text = (base ? `${body}\n${base}/approvals` : body).slice(0, 600);
+  const text = opts.raw ? body.slice(0, 1500) : (base ? `${body}\n${base}/approvals` : body).slice(0, 600);
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), 8000);
   try {
@@ -123,6 +123,14 @@ export async function sendWhatsApp(body: string): Promise<{ sent: boolean; skipp
   const num = raw.replace(/^whatsapp:/, '');
   const from = process.env.TWILIO_WHATSAPP_FROM || 'whatsapp:+14155238886';
   return twilioSend(from.startsWith('whatsapp:') ? from : `whatsapp:${from}`, `whatsapp:${num}`, body);
+}
+
+/** Conversational WhatsApp reply to the owner (no approvals link appended, up to 1500 chars). */
+export async function sendWhatsAppReply(body: string): Promise<{ sent: boolean; skipped?: string }> {
+  const num = process.env.ALERT_WHATSAPP;
+  if (!num) return { sent: false, skipped: 'ALERT_WHATSAPP is not set.' };
+  const from = process.env.TWILIO_WHATSAPP_FROM || 'whatsapp:+14155238886';
+  return twilioSend(from.startsWith('whatsapp:') ? from : `whatsapp:${from}`, `whatsapp:${num}`, body, { raw: true });
 }
 
 export async function notifyApproval(n: ApprovalNotice): Promise<void> {

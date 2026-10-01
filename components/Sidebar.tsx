@@ -5,6 +5,7 @@ import { Bell, LayoutDashboard, Music, Leaf, Video, Settings, Upload, MessageSqu
 export default function Sidebar() {
   const navItems = [
     { name: "The Agency (55 Agents)", href: "/agency", icon: Video },
+    { name: "Talk to Agents", href: "/chat", icon: MessageSquare },
     { name: "Approvals", href: "/approvals", icon: Bell },
     { name: "SaaS Dashboard", href: "/saas", icon: LayoutDashboard },
     { name: "Music Distribution", href: "/music", icon: Music },

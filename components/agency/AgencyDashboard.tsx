@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { AGENCY_AGENTS, AGENT_DIVISIONS } from '../../lib/agency/agentRegistry';
 import { runAgent, runEntireTeam, getTeamAgents } from '../../lib/agency/client';
 import type { AgentExecutionOutput } from '../../lib/agency/types';
@@ -43,6 +43,12 @@ export default function AgencyDashboard() {
   const [liveLogs, setLiveLogs] = useState<AgentExecutionOutput[]>([]);
   const [activeTab, setActiveTab] = useState<'roster' | 'liveLogs' | 'deliverables' | 'approvals'>('roster');
   const [runError, setRunError] = useState<string | null>(null);
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    if (!isSingleRunning) return setElapsed(0);
+    const t = setInterval(() => setElapsed((n) => n + 1), 1000);
+    return () => clearInterval(t);
+  }, [isSingleRunning]);
 
   const filteredAgents = selectedDivision === 'All' 
     ? AGENCY_AGENTS 
@@ -374,7 +380,7 @@ export default function AgencyDashboard() {
                   {isSingleRunning ? (
                     <>
                       <Cpu className="w-3.5 h-3.5 animate-spin" />
-                      Executing Agent #{selectedAgent.number}...
+                      Running Agent #{selectedAgent.number}... {elapsed}s (auto-stops at 4 min)
                     </>
                   ) : (
                     <>

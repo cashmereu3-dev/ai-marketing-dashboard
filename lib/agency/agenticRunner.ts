@@ -39,6 +39,16 @@ const MAX_TOOL_RESULT_CHARS = 6000;
 const MAX_CONTEXT_CHARS = 20000;
 const MAX_CONTEXT_PER_AGENT = 500;
 const MAX_DELEGATIONS = 3;
+const TOOL_TIMEOUT_MS = 30_000;
+/** Whole-run budget: must finish inside the route's maxDuration (300s) with room to respond. */
+const RUN_BUDGET_MS = 240_000;
+
+function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error(`${label} timed out after ${Math.round(ms / 1000)}s.`)), ms);
+    p.then((v) => { clearTimeout(t); resolve(v); }, (e) => { clearTimeout(t); reject(e); });
+  });
+}
 
 function clip(value: unknown, max: number): string {
   let s: string;
@@ -218,7 +228,9 @@ async function runAgentLoop(
   let fallbackText = '';
   let steps = 0;
 
+  const deadline = (opts as { deadline?: number }).deadline ?? Date.now() + RUN_BUDGET_MS;
   for (let step = 0; step < opts.maxSteps; step++) {
+    if (Date.now() > deadline) throw new LLMError(504, `Agent run exceeded its ${Math.round(RUN_BUDGET_MS / 1000)}s budget and was stopped.`);
     steps++;
     let resp;
     try {
@@ -270,7 +282,7 @@ async function runAgentLoop(
       }
       const started = Date.now();
       try {
-        const out = await executeTool(tu.name, tu.input ?? {}, env);
+        const out = await withTimeout(executeTool(tu.name, tu.input ?? {}, env), TOOL_TIMEOUT_MS, `Tool ${tu.name}`);
         toolsInvoked.push({ toolName: tu.name, args: tu.input, result: out, durationMs: Date.now() - started });
         thoughtProcess.push(`Called ${tu.name}(${clip(tu.input, 200)})`);
         results.push({ type: 'tool_result', tool_use_id: tu.id, content: clip(out, MAX_TOOL_RESULT_CHARS) });

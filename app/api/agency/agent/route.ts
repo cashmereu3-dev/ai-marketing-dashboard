@@ -29,7 +29,13 @@ export async function POST(req: Request) {
     return NextResponse.json(out);
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Agent run failed.';
-    const status = err instanceof LLMError ? 502 : message.startsWith('Unknown agent') ? 404 : 500;
-    return NextResponse.json({ error: message }, { status });
+    console.error('[agent]', agentId, err instanceof LLMError ? err.kind : 'APPLICATION_ERROR', message.slice(0, 300));
+    if (err instanceof LLMError) {
+      // 504 = timed out, 503 = provider temporarily unavailable (already retried with backoff), 502 = other provider error.
+      const status = err.kind === 'TIMEOUT' ? 504 : err.kind === 'TRANSIENT_PROVIDER_ERROR' ? 503 : 502;
+      return NextResponse.json({ error: message, code: err.kind, retryable: err.retryable }, { status });
+    }
+    const status = message.startsWith('Unknown agent') ? 404 : 500;
+    return NextResponse.json({ error: message, code: 'APPLICATION_ERROR', retryable: false }, { status });
   }
 }
